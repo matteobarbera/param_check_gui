@@ -2,6 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 import pandas as pd
 import pickle
+import os
 
 
 def parse_url(url):
@@ -59,6 +60,9 @@ def save_to_pickle(data_iter: iter):
 
 
 def load_from_pickle():
+    pickle_f_exists = os.path.isfile(".//" + pickle_file_name)
+    if not pickle_f_exists:
+        run()
     with open(pickle_file_name, 'rb') as f:
         while True:
             try:
@@ -67,9 +71,13 @@ def load_from_pickle():
                 break
 
 
-pickle_file_name = "parameter_data_from_html.dat"
-if __name__ == "__main__":
+def run():
     px4_url = "https://docs.px4.io/v1.9.0/en/advanced_config/parameter_reference.html"
     tables = parse_url(px4_url)
     save_to_pickle(tables)
+
+
+pickle_file_name = "parameter_data_from_html.dat"
+if __name__ == "__main__":
+    run()
 
