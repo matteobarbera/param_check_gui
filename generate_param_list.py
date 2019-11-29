@@ -72,7 +72,7 @@ class App(QDialog):
         lowerRangeLabel.setFont(myFont)
         lowerRangeLabel.setMaximumWidth(100)
 
-        higherRangeLabel = QLabel("Higher Range")
+        higherRangeLabel = QLabel("Upper Range")
         higherRangeLabel.setFont(myFont)
         higherRangeLabel.setMaximumWidth(100)
 
