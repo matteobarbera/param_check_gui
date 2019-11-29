@@ -1,7 +1,9 @@
 import sys
 from PySide2.QtWidgets import (QDialog, QApplication, QWidget, QVBoxLayout, QPushButton, QMessageBox, QFrame,
-                               QHBoxLayout, QComboBox, QScrollArea, QDoubleSpinBox, QLabel)
+                               QHBoxLayout, QComboBox, QScrollArea, QDoubleSpinBox, QLabel, QLineEdit, QCompleter)
 from PySide2.QtGui import QIcon, Qt, QFont
+from PySide2.QtCore import QStringListModel
+from full_param_list_html_parser import load_param_df
 
 
 class App(QDialog):
@@ -90,7 +92,7 @@ class App(QDialog):
         loadedParams[1].paramComboBox.setCurrentIndex(1)
 
         self.specifiedParamsList = []
-        self.paramComboLayout = QVBoxLayout()
+        self.paramComboLayout = QVBoxLayout()  # TODO Update name
         for widget in loadedParams:
             self.add_entry()
             # add_entry() prepends a ParamWidget object to the list, hence [0] index
@@ -176,7 +178,7 @@ class App(QDialog):
 
 class ParamWidget(QWidget):
 
-    _paramList = ["", "hello", "WORLD"]  # TODO Add function to load all param names
+    _paramList = load_param_df()
 
     def __init__(self):
         super(ParamWidget, self).__init__()
@@ -187,10 +189,17 @@ class ParamWidget(QWidget):
         self.rangeHigh = None
 
         # ===================================================
-        # TODO Disable scrolling? Actually somewhat complicated
+        # # TODO Disable scrolling? Actually somewhat complicated
         self.paramComboBox = QComboBox()
-        self.paramComboBox.addItems(ParamWidget._paramList)
+        self.paramComboBox.addItems(ParamWidget._paramList["Name"])
 
+        paramNameList = QStringListModel()
+        paramNameList.setStringList(ParamWidget._paramList["Name"])
+        self.paramCompleter = QCompleter()
+        self.paramCompleter.setModel(paramNameList)
+
+        self.paramLineEdit = QLineEdit()
+        self.paramLineEdit.setCompleter(self.paramCompleter)
         # ---------------------------------------------------
         # Probably go for QDoubleSpinBox
         self.reqValLineEdit = QDoubleSpinBox()
