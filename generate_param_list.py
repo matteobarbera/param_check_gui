@@ -1,7 +1,8 @@
 import sys
 from PySide2.QtWidgets import (QDialog, QApplication, QWidget, QVBoxLayout, QPushButton, QMessageBox, QFrame,
-                               QHBoxLayout, QComboBox, QScrollArea, QDoubleSpinBox, QLabel, QLineEdit, QCompleter)
-from PySide2.QtGui import QIcon, Qt, QFont
+                               QTextBrowser, QHBoxLayout, QComboBox, QDoubleSpinBox, QLabel, QLineEdit, QCompleter,
+                               QTableWidget, QHeaderView)
+from PySide2.QtGui import QIcon, Qt, QFont, QColor
 from PySide2.QtCore import QStringListModel
 from full_param_list_html_parser import load_param_df
 
@@ -59,74 +60,17 @@ class App(QDialog):
 
     def create_centre_layout(self):
         # ==================================================
-        # ---------------- headerLayout ---------------------
-        myFont = QFont()
-        myFont.setUnderline(True)
 
-        paramNameLabel = QLabel("Parameter Name")
-        paramNameLabel.setFont(myFont)
-
-        reqValueLabel = QLabel("Required Value")
-        reqValueLabel.setFont(myFont)
-        reqValueLabel.setMaximumWidth(115)
-
-        lowerRangeLabel = QLabel("Lower Range")
-        lowerRangeLabel.setFont(myFont)
-        lowerRangeLabel.setMaximumWidth(100)
-
-        higherRangeLabel = QLabel("Upper Range")
-        higherRangeLabel.setFont(myFont)
-        higherRangeLabel.setMaximumWidth(100)
-
-        headerLayout = QHBoxLayout()
-        headerLayout.addSpacing(20)
-        headerLayout.addWidget(paramNameLabel)
-        headerLayout.addWidget(reqValueLabel)
-        headerLayout.addWidget(lowerRangeLabel)
-        headerLayout.addWidget(higherRangeLabel)
-        headerLayout.addSpacing(75)
-
-        # ---------------- paramComboLayout -----------------
+        # ---------------- paramEditLayout -----------------
         # TODO Add function that loads already specified parameters in the .h file
-        loadedParams = [ParamWidget(), ParamWidget(), ParamWidget()]
-        loadedParams[1].paramComboBox.setCurrentIndex(1)
+        self.addEntryWidget = ParamWidget()
 
-        self.specifiedParamsList = []
-        self.paramComboLayout = QVBoxLayout()  # TODO Update name
-        for widget in loadedParams:
-            self.add_entry()
-            # add_entry() prepends a ParamWidget object to the list, hence [0] index
-            self.specifiedParamsList[0].paramComboBox.setCurrentIndex(widget.paramComboBox.currentIndex())
-            # set all other values using widget properties
-        self.paramComboLayout.addStretch(1)
-
-        # ---------------- scrollArea -----------------------
-        innerScrollArea = QWidget()
-        innerScrollArea.setLayout(self.paramComboLayout)
-
-        mainScrollArea = QScrollArea()
-        mainScrollArea.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
-        mainScrollArea.setWidgetResizable(True)
-        mainScrollArea.setWidget(innerScrollArea)
-
-        # ---------------- entryBtnLayout -------------------
-        addEntryBtn = QPushButton("Add Entry")
-        addEntryBtn.setIcon(QIcon("plus_icon.png"))
-        addEntryBtn.clicked.connect(self.add_entry)
-        clearEntryBtn = QPushButton("Clear All")
-        clearEntryBtn.setIcon(QIcon("minus_icon.png"))
-        clearEntryBtn.clicked.connect(self.remove_all_entries)
-
-        # TODO Add sort button
-        entryBtnLayout = QHBoxLayout()
-        entryBtnLayout.addWidget(addEntryBtn)
-        entryBtnLayout.addWidget(clearEntryBtn)
+        paramEditLayout = QVBoxLayout()
+        paramEditLayout.addWidget(self.addEntryWidget)
 
         # ---------------- centreLayout ---------------------
         centreLayout = QVBoxLayout()
-        centreLayout.addLayout(headerLayout)
-        centreLayout.addWidget(mainScrollArea)
-        centreLayout.addLayout(entryBtnLayout)
+        centreLayout.addLayout(paramEditLayout)
         self.mainLayout.addLayout(centreLayout)
 
     def create_bottom_layout(self):
@@ -145,24 +89,6 @@ class App(QDialog):
         bottomLayout.addWidget(applyBtn)
 
         self.mainLayout.addLayout(bottomLayout)
-
-    def add_entry(self):
-        self.specifiedParamsList.insert(0, ParamWidget())
-        self.specifiedParamsList[0].removeBtn.clicked.connect(self.remove_entry)
-        self.paramComboLayout.insertWidget(0, self.specifiedParamsList[0])
-
-    def remove_entry(self):
-        sender_object = self.sender().parentWidget()
-        self.specifiedParamsList.remove(sender_object)
-
-    def remove_all_entries(self):
-        choice = QMessageBox.question(self, "Confirm Clear All",
-                                      "\nClear all entries?",
-                                      QMessageBox.Yes, QMessageBox.No)
-        if choice == QMessageBox.Yes:
-            # First entry of list progressively removed, keep referencing first element
-            for i in range(len(self.specifiedParamsList)):
-                self.specifiedParamsList[0].removeBtn.click()
 
     def confirm_close(self):
         # TODO CHANGE THIS
@@ -183,53 +109,119 @@ class ParamWidget(QWidget):
     def __init__(self):
         super(ParamWidget, self).__init__()
 
-        self.paramName = None
-        self.requiredValue = None
-        self.rangeLow = None
-        self.rangeHigh = None
-
         # ===================================================
-        # # TODO Disable scrolling? Actually somewhat complicated
-        self.paramComboBox = QComboBox()
-        self.paramComboBox.addItems(ParamWidget._paramList["Name"])
-
         paramNameList = QStringListModel()
         paramNameList.setStringList(ParamWidget._paramList["Name"])
         self.paramCompleter = QCompleter()
         self.paramCompleter.setModel(paramNameList)
+        self.paramCompleter.setCaseSensitivity(Qt.CaseInsensitive)
 
         self.paramLineEdit = QLineEdit()
         self.paramLineEdit.setCompleter(self.paramCompleter)
+        self.paramLineEdit.setMinimumHeight(25)
+
         # ---------------------------------------------------
         # Probably go for QDoubleSpinBox
         self.reqValLineEdit = QDoubleSpinBox()
-        self.reqValLineEdit.setMaximumWidth(115)
+        self.reqValLineEdit.setMinimumHeight(25)
+        self.reqValLineEdit.setMinimumWidth(110)
         self.reqValLineEdit.setMinimum(-1000)  # or setRange(min, max)
         self.reqValLineEdit.setSingleStep(0.01)
 
         # ---------------------------------------------------
         self.rangeLowLineEdit = QDoubleSpinBox()
-        self.rangeLowLineEdit.setMaximumWidth(100)
+        self.rangeLowLineEdit.setMinimumHeight(25)
+        self.rangeLowLineEdit.setMinimumWidth(100)
         self.rangeHighLineEdit = QDoubleSpinBox()
-        self.rangeHighLineEdit.setMaximumWidth(100)
+        self.rangeHighLineEdit.setMinimumHeight(25)
+        self.rangeHighLineEdit.setMinimumWidth(100)
 
-        self.removeBtn = QPushButton()
-        self.removeBtn.setIcon(QIcon("minus_icon.png"))
-        self.removeBtn.setMaximumWidth(35)
-        self.removeBtn.setFlat(True)
-        self.removeBtn.clicked.connect(self.remove_self)
+        # ---------------- headerLayout ---------------------
+        myFont = QFont()
+        myFont.setUnderline(True)
 
+        paramNameLabel = QLabel("Parameter Name")
+        paramNameLabel.setFont(myFont)
+        paramNameLabel.setBuddy(self.paramLineEdit)
+        paramNameLayout = QVBoxLayout()
+        paramNameLayout.addWidget(paramNameLabel)
+        paramNameLayout.addWidget(self.paramLineEdit)
+
+        reqValueLabel = QLabel("Required Value")
+        reqValueLabel.setBuddy(self.reqValLineEdit)
+        reqValueLabel.setFont(myFont)
+        # reqValueLabel.setMaximumWidth(115)
+        reqValueLayout = QVBoxLayout()
+        reqValueLayout.addWidget(reqValueLabel)
+        reqValueLayout.addWidget(self.reqValLineEdit)
+
+        lowerRangeLabel = QLabel("Lower Range")
+        lowerRangeLabel.setBuddy(self.rangeLowLineEdit)
+        lowerRangeLabel.setFont(myFont)
+        # lowerRangeLabel.setMaximumWidth(100)
+        lowerRangeLayout = QVBoxLayout()
+        lowerRangeLayout.addWidget(lowerRangeLabel)
+        lowerRangeLayout.addWidget(self.rangeLowLineEdit)
+
+        higherRangeLabel = QLabel("Upper Range")
+        higherRangeLabel.setBuddy(self.rangeHighLineEdit)
+        higherRangeLabel.setFont(myFont)
+        # higherRangeLabel.setMaximumWidth(100)
+        higherRangeLayout = QVBoxLayout()
+        higherRangeLayout.addWidget(higherRangeLabel)
+        higherRangeLayout.addWidget(self.rangeHighLineEdit)
+
+        addBtnFont = QFont()
+        addBtnFont.setPointSize(10)
+        self.addBtn = QPushButton("Add Entry")
+        self.addBtn.setFont(addBtnFont)
+        self.addBtn.setMaximumHeight(23)
+        self.addBtn.setIcon(QIcon("plus_icon.png"))
+
+        addBtnLayout = QVBoxLayout()
+        addBtnLayout.addSpacing(23)
+        addBtnLayout.addWidget(self.addBtn)
+
+        headerLayout = QHBoxLayout()
+        # headerLayout.addSpacing(20)
+        headerLayout.addLayout(paramNameLayout)
+        headerLayout.addLayout(reqValueLayout)
+        headerLayout.addLayout(lowerRangeLayout)
+        headerLayout.addLayout(higherRangeLayout)
+        headerLayout.addLayout(addBtnLayout)
+
+        # ---------------- descriptionBox -------------------
+        self.descriptionBox = QTextBrowser()
+        self.descriptionBox.setMinimumHeight(50)
+        self.descriptionBox.setMaximumHeight(130)
+        self.descriptionBox.setStyleSheet("background-color: rgb(240,240,240)")
+
+        # ---------------- paramTableView --------------------
+        self.paramTableView = QTableWidget(0, 4)
+        self.paramTableView.setSortingEnabled(True)
+        self.paramTableView.setHorizontalHeaderLabels(["Parameter Name", "Required", "Minimum", "Maximum"])
+
+        self.paramTableHeader = self.paramTableView.horizontalHeader()
+        self.paramTableHeader.setSectionResizeMode(0, QHeaderView.Stretch)
+
+        # ---------------- clearEntryBtn --------------------
+        clearEntryBtn = QPushButton("Clear All")
+        clearEntryBtn.setIcon(QIcon("minus_icon.png"))
+        clearEntryBtn.clicked.connect(self.remove_all_entries)
         # ===================================================
-        layout = QHBoxLayout()
-        layout.addWidget(self.paramComboBox)
-        layout.addWidget(self.reqValLineEdit)
-        layout.addWidget(self.rangeLowLineEdit)
-        layout.addWidget(self.rangeHighLineEdit)
-        layout.addWidget(self.removeBtn)
+        layout = QVBoxLayout()
+        layout.addLayout(headerLayout)
+        layout.addWidget(self.descriptionBox)
+        layout.addWidget(self.paramTableView)
+        layout.addWidget(clearEntryBtn)
         self.setLayout(layout)
 
-    def remove_self(self):
-        self.deleteLater()
+    def remove_all_entries(self):
+        choice = QMessageBox.question(self, "Confirm Clear All",
+                                      "\nClear all entries?",
+                                      QMessageBox.Yes, QMessageBox.No)
+        if choice == QMessageBox.Yes:
+            pass
 
 
 if __name__ == "__main__":
