@@ -64,13 +64,13 @@ def extract_param_data():
         # Regex breakdown:
         # (?:\s*) Non-capturing group, matches zero to unlimited whitespaces, as many times as possible,
         # giving back as needed
-        # (?P<Name>[a-zA-Z_]+) Named capture group, matches any single character between a-z, A-Z, and 0-9,
-        # as well as _, between one and unlimited times, as much as possible
-        # (?:.*) Non-capturing group, matches any character from zero to unlimited times, as many times as
+        # (?P<Name>.+(?<!\s|\()) Named capture group, matches any character between one and unlimited times,
+        # as much as possible until it encounters a whitespace or bracket
+        # (?:[ \(]*) Non-capturing group, matches a whitespace or ( from zero to unlimited times, as many times as
         # possible, giving back as needed
-        # (?P<Type>(?<=\()[a-zA-Z0-9]+) Named capture group, captures any single character between a-z, A-Z,
-        # 0-9, between one and unlimited times, ONLY IF the pattern is preceded by (
-        name_type_regex = r"(?:\s*)(?P<Name>[a-zA-Z0-9_]+)(?:.*)(?P<Type>(?<=\()[a-zA-Z0-9]+)"
+        # (?P<Type>(?<=\()INT32|FLOAT) Named capture group, captures either INT32 or FLOAT,
+        # ONLY IF the pattern is preceded by (
+        name_type_regex = r"(?:\s*)(?P<Name>.+(?<!\s|\())(?:[ \(]*)(?P<Type>(?<=\()INT32|FLOAT)"
         name_type_df = table["Name"].str.extract(name_type_regex, expand=True)
 
         # ------------- Extract parameter min, max and increment ----------------
@@ -103,7 +103,7 @@ def save_to_pickle(data):
         pickle.dump(data, f)
 
 
-def load_from_pickle():
+def load_param_df():
     pickle_f_exists = os.path.isfile(".//" + pickle_file_name)
     if not pickle_f_exists:
         extract_param_data()
@@ -113,5 +113,6 @@ def load_from_pickle():
 
 pickle_file_name = "parameter_data_from_html.dat"
 px4_param_list_url = "https://docs.px4.io/v1.9.0/en/advanced_config/parameter_reference.html"
+
 if __name__ == "__main__":
     extract_param_data()
