@@ -95,6 +95,7 @@ def extract_param_data():
         tmp_table = pd.concat([name_type_df, min_max_incr_df, table[["Default", "Description"]]], axis=1)
         param_data_df = pd.concat([param_data_df, tmp_table], axis=0, ignore_index=True)
 
+    param_data_df.set_index("Name", inplace=True, drop=False)
     save_to_pickle(param_data_df)
 
 

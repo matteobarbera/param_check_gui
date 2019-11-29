@@ -1,8 +1,8 @@
 import sys
-from PySide2.QtWidgets import (QDialog, QApplication, QWidget, QVBoxLayout, QPushButton, QMessageBox, QFrame,
-                               QTextBrowser, QHBoxLayout, QComboBox, QDoubleSpinBox, QLabel, QLineEdit, QCompleter,
-                               QTableWidget, QHeaderView)
-from PySide2.QtGui import QIcon, Qt, QFont, QColor
+from PySide2.QtWidgets import (QDialog, QApplication, QWidget, QVBoxLayout, QPushButton, QMessageBox, QFrame, QLabel,
+                               QTextBrowser, QHBoxLayout, QDoubleSpinBox, QLineEdit, QCompleter, QTableWidget,
+                               QHeaderView)
+from PySide2.QtGui import QIcon, Qt, QFont
 from PySide2.QtCore import QStringListModel
 from full_param_list_html_parser import load_param_df
 
@@ -120,6 +120,8 @@ class ParamWidget(QWidget):
         self.paramLineEdit.setCompleter(self.paramCompleter)
         self.paramLineEdit.setMinimumHeight(25)
 
+        self.paramLineEdit.editingFinished.connect(self.update_description)
+
         # ---------------------------------------------------
         # Probably go for QDoubleSpinBox
         self.reqValLineEdit = QDoubleSpinBox()
@@ -222,6 +224,11 @@ class ParamWidget(QWidget):
                                       QMessageBox.Yes, QMessageBox.No)
         if choice == QMessageBox.Yes:
             pass
+
+    def update_description(self):
+        if self.paramLineEdit.text() in ParamWidget._paramList["Name"]:
+            parameter_name = self.paramLineEdit.text()
+            self.descriptionBox.setText(ParamWidget._paramList.loc[parameter_name, "Description"])
 
 
 if __name__ == "__main__":
