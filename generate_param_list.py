@@ -120,7 +120,7 @@ class ParamWidget(QWidget):
         self.paramLineEdit.setCompleter(self.paramCompleter)
         self.paramLineEdit.setMinimumHeight(25)
 
-        self.paramLineEdit.editingFinished.connect(self.update_description)
+        self.paramLineEdit.textChanged.connect(self.update_description)
 
         # ---------------------------------------------------
         # Probably go for QDoubleSpinBox
@@ -229,6 +229,11 @@ class ParamWidget(QWidget):
         if self.paramLineEdit.text() in ParamWidget._paramList["Name"]:
             parameter_name = self.paramLineEdit.text()
             self.descriptionBox.setText(ParamWidget._paramList.loc[parameter_name, "Description"])
+        elif len(self.paramLineEdit.text().strip()) != 0:
+            warning_text = "<b>Warning</b>: Parameter not in Full Parameter List "
+            self.descriptionBox.setText(warning_text)
+        else:
+            self.descriptionBox.setText("")
 
 
 if __name__ == "__main__":
