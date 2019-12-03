@@ -1,7 +1,7 @@
 import sys
 from PySide2.QtWidgets import (QDialog, QApplication, QWidget, QVBoxLayout, QPushButton, QMessageBox, QFrame, QLabel,
                                QTextBrowser, QHBoxLayout, QDoubleSpinBox, QLineEdit, QCompleter, QTableWidget,
-                               QHeaderView)
+                               QHeaderView, QTableWidgetItem, QAbstractItemView)
 from PySide2.QtGui import QIcon, Qt, QFont
 from PySide2.QtCore import QStringListModel
 from numpy import inf
@@ -109,6 +109,9 @@ class MyDoubleSpinBox(QDoubleSpinBox):
         super(MyDoubleSpinBox, self).__init__()
         self.labelValue = ""
 
+    def valueFromText(self, text: str):
+        self.setValue(float(text))
+
 
 class ParamWidget(QWidget):
 
@@ -197,6 +200,7 @@ class ParamWidget(QWidget):
         self.addBtn.setFont(addBtnFont)
         self.addBtn.setMaximumHeight(23)
         self.addBtn.setIcon(QIcon("plus_icon.png"))
+        self.addBtn.clicked.connect(self.add_entry)
 
         addBtnLayout = QVBoxLayout()
         addBtnLayout.addSpacing(23)
@@ -219,11 +223,44 @@ class ParamWidget(QWidget):
 
         # ---------------- paramTableView --------------------
         self.paramTableView = QTableWidget(0, 4)
-        self.paramTableView.setSortingEnabled(True)
         self.paramTableView.setHorizontalHeaderLabels(["Parameter Name", "Required", "Minimum", "Maximum"])
+        self.paramTableView.setSortingEnabled(True)
+        self.paramTableView.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.paramTableView.setShowGrid(False)
+        self.paramTableView.setAlternatingRowColors(True)
+        self.paramTableView.setSelectionBehavior(QTableWidget.SelectRows)
+        self.paramTableView.itemPressed.connect(self.select_row)
 
         self.paramTableHeader = self.paramTableView.horizontalHeader()
         self.paramTableHeader.setSectionResizeMode(0, QHeaderView.Stretch)
+
+        self.removeEntryBtn = QPushButton()
+        self.removeEntryBtn.setIcon(QIcon("minus_icon.png"))
+        self.removeEntryBtn.setFlat(True)
+        self.removeEntryBtn.setMaximumSize(20, 20)
+        self.removeEntryBtn.clicked.connect(self.remove_entry)
+
+        self.editEntryBtn = QPushButton()
+        self.editEntryBtn.setIcon(QIcon("edit_icon.png"))
+        self.editEntryBtn.setFlat(True)
+        self.editEntryBtn.setMaximumSize(20, 20)
+        self.editEntryBtn.setEnabled(False)
+        self.editEntryBtn.clicked.connect(self.edit_entry)
+
+        sideBtnLayout = QVBoxLayout()
+        sideBtnLayout.addWidget(self.removeEntryBtn)
+        sideBtnLayout.addWidget(self.editEntryBtn)
+        sideBtnLayout.addStretch(1)
+        sideBtnLayout.setContentsMargins(0, 0, 0, 0)
+
+        btnFrame = QFrame()
+        btnFrame.setFrameStyle(QFrame.Box | QFrame.Sunken)
+        btnFrame.setLineWidth(1)
+        btnFrame.setLayout(sideBtnLayout)
+
+        tableLayout = QHBoxLayout()
+        tableLayout.addWidget(self.paramTableView)
+        tableLayout.addWidget(btnFrame)
 
         # ---------------- clearEntryBtn --------------------
         clearEntryBtn = QPushButton("Clear All")
@@ -233,16 +270,57 @@ class ParamWidget(QWidget):
         layout = QVBoxLayout()
         layout.addLayout(headerLayout)
         layout.addWidget(self.descriptionBox)
-        layout.addWidget(self.paramTableView)
+        layout.addLayout(tableLayout)
         layout.addWidget(clearEntryBtn)
         self.setLayout(layout)
+
+    def add_entry(self):
+        if self.paramLineEdit.text() in ParamWidget._paramList["Name"]:
+            self.add_row()
+            self.paramLineEdit.clear()
+        elif len(self.paramLineEdit.text().strip()) != 0:
+            choice = QMessageBox.question(self, "Unknown parameter",
+                                          "The parameter is not in the Full Parameter List"
+                                          "\nAre you sure you want to add it? PX4 might crash",
+                                          QMessageBox.Yes, QMessageBox.No)
+            if choice == QMessageBox.Yes:
+                self.add_row()
+                self.paramLineEdit.clear()
+
+    def add_row(self):
+        # TODO Allow overwriting parameter
+        for i in range(self.paramTableView.rowCount()):
+            if self.paramLineEdit.text() == self.paramTableView.item(i, 0).text():
+                QMessageBox.critical(self, "Error", f"The {self.paramLineEdit.text()} has already been specified")
+                return
+        # TODO Add logic to prevent wrong values being filled
+        # TODO Fill in empty value
+        self.paramTableView.setSortingEnabled(False)
+        self.paramTableView.insertRow(0)
+        self.paramTableView.setItem(0, 0, QTableWidgetItem(self.paramLineEdit.text()))
+        self.paramTableView.setItem(0, 1, QTableWidgetItem(str(self.reqValLineEdit.value())))
+        self.paramTableView.setItem(0, 2, QTableWidgetItem(str(self.rangeLowLineEdit.value())))
+        self.paramTableView.setItem(0, 3, QTableWidgetItem(str(self.rangeHighLineEdit.value())))
+        self.paramTableView.setSortingEnabled(True)
+
+    def edit_entry(self):
+        row_index = self.paramTableView.currentRow()
+        self.paramLineEdit.setText(self.paramTableView.item(row_index, 0).text())
+
+    def remove_entry(self):
+        selection = self.paramTableView.selectionModel().selectedRows()
+        indices = sorted([index.row() for index in selection], reverse=True)
+        for index in indices:
+            self.paramTableView.removeRow(index)
 
     def remove_all_entries(self):
         choice = QMessageBox.question(self, "Confirm Clear All",
                                       "\nClear all entries?",
                                       QMessageBox.Yes, QMessageBox.No)
         if choice == QMessageBox.Yes:
-            pass
+            self.paramTableView.clearContents()
+            for row in range(self.paramTableView.rowCount()):
+                self.paramTableView.removeRow(row)
 
     def update_description(self):
         if self.paramLineEdit.text() in ParamWidget._paramList["Name"]:
@@ -298,6 +376,19 @@ class ParamWidget(QWidget):
             self.clear_spinbox_details(self.reqValLineEdit)
             self.clear_spinbox_details(self.rangeLowLineEdit)
             self.clear_spinbox_details(self.rangeHighLineEdit)
+        for i in range(self.paramTableView.rowCount()):
+            if self.paramLineEdit.text() == self.paramTableView.item(i, 0).text():
+                self.reqValLineEdit.valueFromText(self.paramTableView.item(i, 1).text())
+                self.rangeLowLineEdit.valueFromText(self.paramTableView.item(i, 2).text())
+                self.rangeHighLineEdit.valueFromText(self.paramTableView.item(i, 3).text())
+                return
+
+    def select_row(self):
+        selection = self.paramTableView.selectionModel().selectedRows()
+        if len(selection) == 0 or len(selection) > 1:
+            self.editEntryBtn.setEnabled(False)
+        else:
+            self.editEntryBtn.setEnabled(True)
 
 
 if __name__ == "__main__":
