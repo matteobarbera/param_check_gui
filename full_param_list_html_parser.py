@@ -1,7 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
-from numpy import nan
+from numpy import nan, inf
 import pickle
 import os
 
@@ -96,6 +96,11 @@ def extract_param_data():
         param_data_df = pd.concat([param_data_df, tmp_table], axis=0, ignore_index=True)
 
     param_data_df.set_index("Name", inplace=True, drop=False)
+    min_mask = param_data_df["Min"] == "?"
+    param_data_df.loc[min_mask, "Min"] = -inf
+    max_mask = param_data_df["Max"] == "?"
+    param_data_df.loc[max_mask, "Max"] = inf
+    param_data_df[["Default", "Min", "Max", "Incr"]] = param_data_df[["Default", "Min", "Max", "Incr"]].apply(pd.to_numeric)
     save_to_pickle(param_data_df)
 
 

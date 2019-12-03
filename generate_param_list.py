@@ -4,6 +4,7 @@ from PySide2.QtWidgets import (QDialog, QApplication, QWidget, QVBoxLayout, QPus
                                QHeaderView)
 from PySide2.QtGui import QIcon, Qt, QFont
 from PySide2.QtCore import QStringListModel
+from numpy import inf
 from full_param_list_html_parser import load_param_df
 
 
@@ -102,6 +103,13 @@ class App(QDialog):
             pass
 
 
+class MyDoubleSpinBox(QDoubleSpinBox):
+
+    def __init__(self):
+        super(MyDoubleSpinBox, self).__init__()
+        self.labelValue = ""
+
+
 class ParamWidget(QWidget):
 
     _paramList = load_param_df()
@@ -121,22 +129,25 @@ class ParamWidget(QWidget):
         self.paramLineEdit.setMinimumHeight(25)
 
         self.paramLineEdit.textChanged.connect(self.update_description)
-
-        # ---------------------------------------------------
-        # Probably go for QDoubleSpinBox
-        self.reqValLineEdit = QDoubleSpinBox()
+        self.paramLineEdit.textChanged.connect(self.update_spinboxes)
+        # ---------------- SpinBoxes ------------------------
+        self.reqValLineEdit = MyDoubleSpinBox()
         self.reqValLineEdit.setMinimumHeight(25)
         self.reqValLineEdit.setMinimumWidth(110)
-        self.reqValLineEdit.setMinimum(-1000)  # or setRange(min, max)
-        self.reqValLineEdit.setSingleStep(0.01)
+        self.reqValLineEdit.clear()
+        self.reqValLineEdit.setReadOnly(True)
 
-        # ---------------------------------------------------
-        self.rangeLowLineEdit = QDoubleSpinBox()
+        self.rangeLowLineEdit = MyDoubleSpinBox()
         self.rangeLowLineEdit.setMinimumHeight(25)
         self.rangeLowLineEdit.setMinimumWidth(100)
-        self.rangeHighLineEdit = QDoubleSpinBox()
+        self.rangeLowLineEdit.clear()
+        self.rangeLowLineEdit.setReadOnly(True)
+
+        self.rangeHighLineEdit = MyDoubleSpinBox()
         self.rangeHighLineEdit.setMinimumHeight(25)
         self.rangeHighLineEdit.setMinimumWidth(100)
+        self.rangeHighLineEdit.clear()
+        self.rangeHighLineEdit.setReadOnly(True)
 
         # ---------------- headerLayout ---------------------
         myFont = QFont()
@@ -148,30 +159,37 @@ class ParamWidget(QWidget):
         paramNameLayout = QVBoxLayout()
         paramNameLayout.addWidget(paramNameLabel)
         paramNameLayout.addWidget(self.paramLineEdit)
+        paramNameLayout.addSpacing(23)
 
         reqValueLabel = QLabel("Required Value")
         reqValueLabel.setBuddy(self.reqValLineEdit)
         reqValueLabel.setFont(myFont)
+        self.defaultLabel = QLabel(f"Def: {self.reqValLineEdit.labelValue}")
         # reqValueLabel.setMaximumWidth(115)
         reqValueLayout = QVBoxLayout()
         reqValueLayout.addWidget(reqValueLabel)
         reqValueLayout.addWidget(self.reqValLineEdit)
+        reqValueLayout.addWidget(self.defaultLabel)
 
         lowerRangeLabel = QLabel("Lower Range")
         lowerRangeLabel.setBuddy(self.rangeLowLineEdit)
         lowerRangeLabel.setFont(myFont)
+        self.minValueLabel = QLabel(f"Min: {self.rangeLowLineEdit.labelValue}")
         # lowerRangeLabel.setMaximumWidth(100)
         lowerRangeLayout = QVBoxLayout()
         lowerRangeLayout.addWidget(lowerRangeLabel)
         lowerRangeLayout.addWidget(self.rangeLowLineEdit)
+        lowerRangeLayout.addWidget(self.minValueLabel)
 
         higherRangeLabel = QLabel("Upper Range")
         higherRangeLabel.setBuddy(self.rangeHighLineEdit)
         higherRangeLabel.setFont(myFont)
+        self.maxValueLabel = QLabel(f"Max: {self.rangeHighLineEdit.labelValue}")
         # higherRangeLabel.setMaximumWidth(100)
         higherRangeLayout = QVBoxLayout()
         higherRangeLayout.addWidget(higherRangeLabel)
         higherRangeLayout.addWidget(self.rangeHighLineEdit)
+        higherRangeLayout.addWidget(self.maxValueLabel)
 
         addBtnFont = QFont()
         addBtnFont.setPointSize(10)
@@ -183,6 +201,7 @@ class ParamWidget(QWidget):
         addBtnLayout = QVBoxLayout()
         addBtnLayout.addSpacing(23)
         addBtnLayout.addWidget(self.addBtn)
+        addBtnLayout.addSpacing(23)
 
         headerLayout = QHBoxLayout()
         # headerLayout.addSpacing(20)
@@ -234,6 +253,51 @@ class ParamWidget(QWidget):
             self.descriptionBox.setText(warning_text)
         else:
             self.descriptionBox.setText("")
+
+    @staticmethod
+    def set_spinbox_details(spinbox: MyDoubleSpinBox, parameter_name: str, label_type: str):
+        spinbox.setRange(ParamWidget._paramList.loc[parameter_name, "Min"],
+                         ParamWidget._paramList.loc[parameter_name, "Max"])
+        spinbox.setSingleStep(ParamWidget._paramList.loc[parameter_name, "Incr"])
+        spinbox.labelValue = ParamWidget._paramList.loc[parameter_name, label_type]
+        spinbox.clear()
+        spinbox.setReadOnly(False)
+
+    @staticmethod
+    def clear_spinbox_details(spinbox: MyDoubleSpinBox):
+        spinbox.labelValue = ""
+        spinbox.clear()
+        spinbox.setReadOnly(True)
+
+    @staticmethod
+    def unknown_spinbox_details(spinbox: MyDoubleSpinBox):
+        spinbox.clear()
+        spinbox.setRange(-inf, inf)
+        spinbox.setSingleStep(1e-5)
+        spinbox.labelValue = ""
+        spinbox.clear()
+        spinbox.setReadOnly(False)
+
+    def update_spinboxes(self):
+        if self.paramLineEdit.text() in ParamWidget._paramList["Name"]:
+            parameter_name = self.paramLineEdit.text()
+            self.set_spinbox_details(self.reqValLineEdit, parameter_name, "Default")
+            self.defaultLabel.setText(f"Def: {self.reqValLineEdit.labelValue}")
+            self.set_spinbox_details(self.rangeLowLineEdit, parameter_name, "Min")
+            self.minValueLabel.setText(f"Min: {self.rangeLowLineEdit.labelValue}")
+            self.set_spinbox_details(self.rangeHighLineEdit, parameter_name, "Max")
+            self.maxValueLabel.setText(f"Max: {self.rangeHighLineEdit.labelValue}")
+        elif len(self.paramLineEdit.text().strip()) != 0:
+            self.unknown_spinbox_details(self.reqValLineEdit)
+            self.defaultLabel.setText(f"Def: {self.reqValLineEdit.labelValue}")
+            self.unknown_spinbox_details(self.rangeLowLineEdit)
+            self.minValueLabel.setText(f"Min: {self.rangeLowLineEdit.labelValue}")
+            self.unknown_spinbox_details(self.rangeHighLineEdit)
+            self.maxValueLabel.setText(f"Max: {self.rangeHighLineEdit.labelValue}")
+        else:
+            self.clear_spinbox_details(self.reqValLineEdit)
+            self.clear_spinbox_details(self.rangeLowLineEdit)
+            self.clear_spinbox_details(self.rangeHighLineEdit)
 
 
 if __name__ == "__main__":
