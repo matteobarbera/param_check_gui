@@ -8,6 +8,7 @@ from PySide2.QtWidgets import (QDialog, QApplication, QWidget, QVBoxLayout, QPus
 from numpy import isnan
 
 from full_param_list_html_parser import load_param_df
+from load_critical_parameters import read_critical_parameters
 
 
 class App(QDialog):
@@ -65,7 +66,6 @@ class App(QDialog):
         # ==================================================
 
         # ---------------- paramEditLayout -----------------
-        # TODO Add function that loads already specified parameters in the .h file
         self.addEntryWidget = ParamWidget()
 
         paramEditLayout = QVBoxLayout()
@@ -121,6 +121,7 @@ class MyQLineEdit(QLineEdit):
 
 # TODO Improve code layout
 # TODO Refactor variables where appropriate
+# TODO Improve minimum widget height/width
 class ParamWidget(QWidget):
 
     _paramList = load_param_df()
@@ -131,12 +132,12 @@ class ParamWidget(QWidget):
         # ===================================================
         paramNameList = QStringListModel()
         paramNameList.setStringList(ParamWidget._paramList["Name"])
-        self.paramCompleter = QCompleter()
-        self.paramCompleter.setModel(paramNameList)
-        self.paramCompleter.setCaseSensitivity(Qt.CaseInsensitive)
+        paramCompleter = QCompleter()
+        paramCompleter.setModel(paramNameList)
+        paramCompleter.setCaseSensitivity(Qt.CaseInsensitive)
 
         self.paramLineEdit = QLineEdit()
-        self.paramLineEdit.setCompleter(self.paramCompleter)
+        self.paramLineEdit.setCompleter(paramCompleter)
         self.paramLineEdit.setMinimumHeight(25)
 
         self.paramLineEdit.textChanged.connect(self.update_description)
@@ -181,7 +182,7 @@ class ParamWidget(QWidget):
         reqValueLabel.setBuddy(self.reqValLineEdit)
         reqValueLabel.setFont(myFont)
         self.incrLabel = QLabel("Incr:")
-        reqValueLabel.setMaximumWidth(100)
+        # reqValueLabel.setMaximumWidth(100)
         reqValueLayout = QVBoxLayout()
         reqValueLayout.addWidget(reqValueLabel)
         reqValueLayout.addWidget(self.reqValLineEdit)
@@ -190,7 +191,7 @@ class ParamWidget(QWidget):
         lowerRangeLabel = QLabel("Lower Range")
         lowerRangeLabel.setBuddy(self.rangeLowLineEdit)
         lowerRangeLabel.setFont(myFont)
-        lowerRangeLabel.setMaximumWidth(90)
+        # lowerRangeLabel.setMaximumWidth(90)
         lowerRangeLayout = QVBoxLayout()
         lowerRangeLayout.addWidget(lowerRangeLabel)
         lowerRangeLayout.addWidget(self.rangeLowLineEdit)
@@ -199,7 +200,7 @@ class ParamWidget(QWidget):
         higherRangeLabel = QLabel("Upper Range")
         higherRangeLabel.setBuddy(self.rangeHighLineEdit)
         higherRangeLabel.setFont(myFont)
-        higherRangeLabel.setMaximumWidth(90)
+        # higherRangeLabel.setMaximumWidth(90)
         higherRangeLayout = QVBoxLayout()
         higherRangeLayout.addWidget(higherRangeLabel)
         higherRangeLayout.addWidget(self.rangeHighLineEdit)
@@ -243,6 +244,7 @@ class ParamWidget(QWidget):
         self.paramTableView.verticalHeader().setDefaultSectionSize(25)
         self.paramTableView.setStyleSheet("alternate-background-color: LightSteelBlue")
         self.paramTableView.itemPressed.connect(self.select_row)
+        self.load_parameters()
 
         self.paramTableHeader = self.paramTableView.horizontalHeader()
         self.paramTableHeader.setSectionResizeMode(0, QHeaderView.Stretch)
@@ -317,7 +319,7 @@ class ParamWidget(QWidget):
             self.paramTableView.insertRow(0)
             self.paramTableView.setItem(0, 0, QTableWidgetItem(self.paramLineEdit.text()))
             self.paramTableView.setItem(0, 1, QTableWidgetItem(self.reqValLineEdit.text()))
-            if self.rangeLowLineEdit.isEnabled():
+            if self.rangeLowLineEdit.isEnabled() and self.rangeHighLineEdit.isEnabled():
                 self.paramTableView.setItem(0, 2, QTableWidgetItem(self.rangeLowLineEdit.text()))
                 self.paramTableView.setItem(0, 3, QTableWidgetItem(self.rangeHighLineEdit.text()))
             self.paramTableView.setSortingEnabled(True)
@@ -368,10 +370,16 @@ class ParamWidget(QWidget):
                 precision = 0
         if ParamWidget._paramList.loc[parameter_name, "Type"] == "INT32":
             spinbox.set_int_validator(min_value, max_value)
+            if not isnan(ParamWidget._paramList.loc[parameter_name, label_argument]):
+                spinbox.setPlaceholderText(
+                    f"{label_argument}: {round(float(ParamWidget._paramList.loc[parameter_name, label_argument]))}")
+            else:
+                spinbox.setPlaceholderText(
+                    f"{label_argument}: {ParamWidget._paramList.loc[parameter_name, label_argument]}")
         else:
             spinbox.set_double_validator(min_value, max_value, precision)
-
-        spinbox.setPlaceholderText(f"{label_argument}: {ParamWidget._paramList.loc[parameter_name, label_argument]}")
+            spinbox.setPlaceholderText(
+                f"{label_argument}: {ParamWidget._paramList.loc[parameter_name, label_argument]}")
         spinbox.clear()
         spinbox.setReadOnly(False)
 
@@ -408,9 +416,12 @@ class ParamWidget(QWidget):
             self.incrLabel.setText("Incr:")
         for i in range(self.paramTableView.rowCount()):
             if self.paramLineEdit.text() == self.paramTableView.item(i, 0).text():
-                self.reqValLineEdit.setText(self.paramTableView.item(i, 1).text())
-                self.rangeLowLineEdit.setText(self.paramTableView.item(i, 2).text())
-                self.rangeHighLineEdit.setText(self.paramTableView.item(i, 3).text())
+                if self.paramTableView.item(i, 1) is not None:
+                    self.reqValLineEdit.setText(self.paramTableView.item(i, 1).text())
+                if self.paramTableView.item(i, 2) is not None:
+                    self.rangeLowLineEdit.setText(self.paramTableView.item(i, 2).text())
+                if self.paramTableView.item(i, 3) is not None:
+                    self.rangeHighLineEdit.setText(self.paramTableView.item(i, 3).text())
                 return
 
     def disable_range_boxes(self):
@@ -423,10 +434,24 @@ class ParamWidget(QWidget):
 
     def select_row(self):
         selection = self.paramTableView.selectionModel().selectedRows()
+        # Only one parameter at a time can be edited
         if len(selection) == 0 or len(selection) > 1:
             self.editEntryBtn.setEnabled(False)
         else:
             self.editEntryBtn.setEnabled(True)
+
+    def load_parameters(self):
+        h_file_parameters = read_critical_parameters()
+        self.paramTableView.setSortingEnabled(False)
+        for param_name, specified_values in h_file_parameters.items():
+            self.paramTableView.insertRow(0)
+            self.paramTableView.setItem(0, 0, QTableWidgetItem(param_name))
+            if len(specified_values) == 1:
+                self.paramTableView.setItem(0, 1, QTableWidgetItem(specified_values[0]))
+            else:
+                self.paramTableView.setItem(0, 2, QTableWidgetItem(specified_values[0]))
+                self.paramTableView.setItem(0, 3, QTableWidgetItem(specified_values[1]))
+        self.paramTableView.setSortingEnabled(True)
 
 
 if __name__ == "__main__":
