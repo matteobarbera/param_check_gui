@@ -143,13 +143,13 @@ class ParamWidget(QWidget):
         self.paramLineEdit.textChanged.connect(self.update_spinboxes)
 
         # ---------------- LineEdits ------------------------
-        # TODO Improve box lengths
         self.reqValLineEdit = MyQLineEdit()
         self.reqValLineEdit.setMinimumHeight(25)
         self.reqValLineEdit.setMinimumWidth(110)
         self.reqValLineEdit.set_double_validator(-1e9, 1e9)
         self.reqValLineEdit.clear()
         self.reqValLineEdit.setReadOnly(True)
+        self.reqValLineEdit.textChanged.connect(self.disable_range_boxes)
 
         self.rangeLowLineEdit = MyQLineEdit()
         self.rangeLowLineEdit.setMinimumHeight(25)
@@ -165,7 +165,6 @@ class ParamWidget(QWidget):
 
         # ---------------- headerLayout ---------------------
         myFont = QFont()
-        # myFont.setUnderline(True)
         myFont.setBold(True)
 
         spacerValue = 23
@@ -182,7 +181,7 @@ class ParamWidget(QWidget):
         reqValueLabel.setBuddy(self.reqValLineEdit)
         reqValueLabel.setFont(myFont)
         self.incrLabel = QLabel("Incr:")
-        # reqValueLabel.setMaximumWidth(115)
+        reqValueLabel.setMaximumWidth(100)
         reqValueLayout = QVBoxLayout()
         reqValueLayout.addWidget(reqValueLabel)
         reqValueLayout.addWidget(self.reqValLineEdit)
@@ -191,7 +190,7 @@ class ParamWidget(QWidget):
         lowerRangeLabel = QLabel("Lower Range")
         lowerRangeLabel.setBuddy(self.rangeLowLineEdit)
         lowerRangeLabel.setFont(myFont)
-        # lowerRangeLabel.setMaximumWidth(100)
+        lowerRangeLabel.setMaximumWidth(90)
         lowerRangeLayout = QVBoxLayout()
         lowerRangeLayout.addWidget(lowerRangeLabel)
         lowerRangeLayout.addWidget(self.rangeLowLineEdit)
@@ -200,7 +199,7 @@ class ParamWidget(QWidget):
         higherRangeLabel = QLabel("Upper Range")
         higherRangeLabel.setBuddy(self.rangeHighLineEdit)
         higherRangeLabel.setFont(myFont)
-        # higherRangeLabel.setMaximumWidth(100)
+        higherRangeLabel.setMaximumWidth(90)
         higherRangeLayout = QVBoxLayout()
         higherRangeLayout.addWidget(higherRangeLabel)
         higherRangeLayout.addWidget(self.rangeHighLineEdit)
@@ -220,7 +219,6 @@ class ParamWidget(QWidget):
         addBtnLayout.addSpacing(spacerValue)
 
         headerLayout = QHBoxLayout()
-        # headerLayout.addSpacing(20)
         headerLayout.addLayout(paramNameLayout)
         headerLayout.addLayout(reqValueLayout)
         headerLayout.addLayout(lowerRangeLayout)
@@ -319,8 +317,9 @@ class ParamWidget(QWidget):
             self.paramTableView.insertRow(0)
             self.paramTableView.setItem(0, 0, QTableWidgetItem(self.paramLineEdit.text()))
             self.paramTableView.setItem(0, 1, QTableWidgetItem(self.reqValLineEdit.text()))
-            self.paramTableView.setItem(0, 2, QTableWidgetItem(self.rangeLowLineEdit.text()))
-            self.paramTableView.setItem(0, 3, QTableWidgetItem(self.rangeHighLineEdit.text()))
+            if self.rangeLowLineEdit.isEnabled():
+                self.paramTableView.setItem(0, 2, QTableWidgetItem(self.rangeLowLineEdit.text()))
+                self.paramTableView.setItem(0, 3, QTableWidgetItem(self.rangeHighLineEdit.text()))
             self.paramTableView.setSortingEnabled(True)
             self.paramLineEdit.clear()
 
@@ -413,6 +412,14 @@ class ParamWidget(QWidget):
                 self.rangeLowLineEdit.setText(self.paramTableView.item(i, 2).text())
                 self.rangeHighLineEdit.setText(self.paramTableView.item(i, 3).text())
                 return
+
+    def disable_range_boxes(self):
+        if self.reqValLineEdit.text() != "":
+            self.rangeLowLineEdit.setDisabled(True)
+            self.rangeHighLineEdit.setDisabled(True)
+        else:
+            self.rangeLowLineEdit.setDisabled(False)
+            self.rangeHighLineEdit.setDisabled(False)
 
     def select_row(self):
         selection = self.paramTableView.selectionModel().selectedRows()
