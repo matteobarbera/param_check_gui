@@ -1,7 +1,7 @@
 import sys
 from PySide2.QtWidgets import (QDialog, QApplication, QWidget, QVBoxLayout, QPushButton, QMessageBox, QFrame, QLabel,
                                QTextBrowser, QHBoxLayout, QDoubleSpinBox, QLineEdit, QCompleter, QTableWidget,
-                               QHeaderView, QTableWidgetItem, QAbstractItemView)
+                               QHeaderView, QTableWidgetItem, QAbstractItemView, QSpinBox)
 from PySide2.QtGui import QIcon, Qt, QFont
 from PySide2.QtCore import QStringListModel
 from numpy import inf
@@ -109,10 +109,23 @@ class MyDoubleSpinBox(QDoubleSpinBox):
         super(MyDoubleSpinBox, self).__init__()
         self.labelValue = ""
 
+    def valueFromText(self, text: str) -> float:
+        return float(text)
+
+
+# TODO Remove?
+class MySpinBox(QSpinBox):
+
+    def __init__(self):
+        super(MySpinBox, self).__init__()
+        self.labelValue = ""
+
     def valueFromText(self, text: str):
-        self.setValue(float(text))
+        self.setValue(int(text))
 
 
+# TODO Improve layout
+# TODO Refactor variables where appropriate
 class ParamWidget(QWidget):
 
     _paramList = load_param_df()
@@ -133,6 +146,7 @@ class ParamWidget(QWidget):
 
         self.paramLineEdit.textChanged.connect(self.update_description)
         self.paramLineEdit.textChanged.connect(self.update_spinboxes)
+
         # ---------------- SpinBoxes ------------------------
         self.reqValLineEdit = MyDoubleSpinBox()
         self.reqValLineEdit.setMinimumHeight(25)
@@ -154,7 +168,8 @@ class ParamWidget(QWidget):
 
         # ---------------- headerLayout ---------------------
         myFont = QFont()
-        myFont.setUnderline(True)
+        # myFont.setUnderline(True)
+        myFont.setBold(True)
 
         paramNameLabel = QLabel("Parameter Name")
         paramNameLabel.setFont(myFont)
@@ -219,6 +234,7 @@ class ParamWidget(QWidget):
         self.descriptionBox = QTextBrowser()
         self.descriptionBox.setMinimumHeight(50)
         self.descriptionBox.setMaximumHeight(130)
+        self.descriptionBox.setAcceptRichText(True)
         self.descriptionBox.setStyleSheet("background-color: rgb(240,240,240)")
 
         # ---------------- paramTableView --------------------
@@ -229,6 +245,8 @@ class ParamWidget(QWidget):
         self.paramTableView.setShowGrid(False)
         self.paramTableView.setAlternatingRowColors(True)
         self.paramTableView.setSelectionBehavior(QTableWidget.SelectRows)
+        self.paramTableView.verticalHeader().setDefaultSectionSize(25)
+        self.paramTableView.setStyleSheet("alternate-background-color: LightSteelBlue")
         self.paramTableView.itemPressed.connect(self.select_row)
 
         self.paramTableHeader = self.paramTableView.horizontalHeader()
@@ -266,6 +284,7 @@ class ParamWidget(QWidget):
         clearEntryBtn = QPushButton("Clear All")
         clearEntryBtn.setIcon(QIcon("minus_icon.png"))
         clearEntryBtn.clicked.connect(self.remove_all_entries)
+
         # ===================================================
         layout = QVBoxLayout()
         layout.addLayout(headerLayout)
@@ -288,13 +307,19 @@ class ParamWidget(QWidget):
                 self.paramLineEdit.clear()
 
     def add_row(self):
-        # TODO Allow overwriting parameter
         for i in range(self.paramTableView.rowCount()):
             if self.paramLineEdit.text() == self.paramTableView.item(i, 0).text():
-                QMessageBox.critical(self, "Error", f"The {self.paramLineEdit.text()} has already been specified")
-                return
+                choice = QMessageBox.question(self, "Warning",
+                                              f"{self.paramLineEdit.text()} has already been specified."
+                                              f"\nDo you want to overwrite it?",
+                                              QMessageBox.Yes, QMessageBox.No)
+                if choice == QMessageBox.Yes:
+                    self.paramTableView.removeRow(i)
+                    break
+                else:
+                    return
         # TODO Add logic to prevent wrong values being filled
-        # TODO Fill in empty value
+        # TODO Prevent add entry if all fields are blank
         self.paramTableView.setSortingEnabled(False)
         self.paramTableView.insertRow(0)
         self.paramTableView.setItem(0, 0, QTableWidgetItem(self.paramLineEdit.text()))
@@ -314,8 +339,7 @@ class ParamWidget(QWidget):
             self.paramTableView.removeRow(index)
 
     def remove_all_entries(self):
-        choice = QMessageBox.question(self, "Confirm Clear All",
-                                      "\nClear all entries?",
+        choice = QMessageBox.question(self, "Confirm Clear All", "\nClear all entries?",
                                       QMessageBox.Yes, QMessageBox.No)
         if choice == QMessageBox.Yes:
             self.paramTableView.clearContents()
@@ -334,6 +358,9 @@ class ParamWidget(QWidget):
 
     @staticmethod
     def set_spinbox_details(spinbox: MyDoubleSpinBox, parameter_name: str, label_type: str):
+        # FIXME If Min/Max is NaN it doesn't work (maybe it shouldn't)
+        # FIXME if Incr is NaN it's even worse
+        # TODO Perhaps instead of spinbox use LineEdit and display Incr, more responsibility on user
         spinbox.setRange(ParamWidget._paramList.loc[parameter_name, "Min"],
                          ParamWidget._paramList.loc[parameter_name, "Max"])
         spinbox.setSingleStep(ParamWidget._paramList.loc[parameter_name, "Incr"])
@@ -389,6 +416,8 @@ class ParamWidget(QWidget):
             self.editEntryBtn.setEnabled(False)
         else:
             self.editEntryBtn.setEnabled(True)
+
+    # TODO Change spinbox type depending on parameter type?
 
 
 if __name__ == "__main__":
