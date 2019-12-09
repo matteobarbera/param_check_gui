@@ -119,7 +119,7 @@ class MyQLineEdit(QLineEdit):
         self.setValidator(validator)
 
 
-# TODO Improve layout
+# TODO Improve code layout
 # TODO Refactor variables where appropriate
 class ParamWidget(QWidget):
 
@@ -293,7 +293,6 @@ class ParamWidget(QWidget):
     def add_entry(self):
         if self.paramLineEdit.text() in ParamWidget._paramList["Name"]:
             self.add_row()
-            self.paramLineEdit.clear()
         elif len(self.paramLineEdit.text().strip()) != 0:
             choice = QMessageBox.question(self, "Unknown parameter",
                                           "The parameter is not in the Full Parameter List"
@@ -301,7 +300,6 @@ class ParamWidget(QWidget):
                                           QMessageBox.Yes, QMessageBox.No)
             if choice == QMessageBox.Yes:
                 self.add_row()
-                self.paramLineEdit.clear()
 
     def add_row(self):
         for i in range(self.paramTableView.rowCount()):
@@ -316,14 +314,15 @@ class ParamWidget(QWidget):
                 else:
                     return
         # TODO Add logic to prevent wrong values being filled
-        # TODO Prevent add entry if all fields are blank
-        self.paramTableView.setSortingEnabled(False)
-        self.paramTableView.insertRow(0)
-        self.paramTableView.setItem(0, 0, QTableWidgetItem(self.paramLineEdit.text()))
-        self.paramTableView.setItem(0, 1, QTableWidgetItem(self.reqValLineEdit.text()))
-        self.paramTableView.setItem(0, 2, QTableWidgetItem(self.rangeLowLineEdit.text()))
-        self.paramTableView.setItem(0, 3, QTableWidgetItem(self.rangeHighLineEdit.text()))
-        self.paramTableView.setSortingEnabled(True)
+        if len((self.reqValLineEdit.text() + self.rangeLowLineEdit.text() + self.rangeHighLineEdit.text()).strip()) != 0:
+            self.paramTableView.setSortingEnabled(False)
+            self.paramTableView.insertRow(0)
+            self.paramTableView.setItem(0, 0, QTableWidgetItem(self.paramLineEdit.text()))
+            self.paramTableView.setItem(0, 1, QTableWidgetItem(self.reqValLineEdit.text()))
+            self.paramTableView.setItem(0, 2, QTableWidgetItem(self.rangeLowLineEdit.text()))
+            self.paramTableView.setItem(0, 3, QTableWidgetItem(self.rangeHighLineEdit.text()))
+            self.paramTableView.setSortingEnabled(True)
+            self.paramLineEdit.clear()
 
     def edit_entry(self):
         row_index = self.paramTableView.currentRow()
@@ -421,8 +420,6 @@ class ParamWidget(QWidget):
             self.editEntryBtn.setEnabled(False)
         else:
             self.editEntryBtn.setEnabled(True)
-
-    # TODO Change spinbox type depending on parameter type?
 
 
 if __name__ == "__main__":
