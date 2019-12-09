@@ -1,10 +1,12 @@
 import sys
-from PySide2.QtWidgets import (QDialog, QApplication, QWidget, QVBoxLayout, QPushButton, QMessageBox, QFrame, QLabel,
-                               QTextBrowser, QHBoxLayout, QDoubleSpinBox, QLineEdit, QCompleter, QTableWidget,
-                               QHeaderView, QTableWidgetItem, QAbstractItemView, QSpinBox)
-from PySide2.QtGui import QIcon, Qt, QFont
+
 from PySide2.QtCore import QStringListModel
-from numpy import inf
+from PySide2.QtGui import QIcon, Qt, QFont, QIntValidator, QDoubleValidator
+from PySide2.QtWidgets import (QDialog, QApplication, QWidget, QVBoxLayout, QPushButton, QMessageBox, QFrame, QLabel,
+                               QTextBrowser, QHBoxLayout, QLineEdit, QCompleter, QTableWidget,
+                               QHeaderView, QTableWidgetItem, QAbstractItemView)
+from numpy import isnan
+
 from full_param_list_html_parser import load_param_df
 
 
@@ -103,25 +105,18 @@ class App(QDialog):
             pass
 
 
-class MyDoubleSpinBox(QDoubleSpinBox):
+class MyQLineEdit(QLineEdit):
 
     def __init__(self):
-        super(MyDoubleSpinBox, self).__init__()
-        self.labelValue = ""
+        super(MyQLineEdit, self).__init__()
 
-    def valueFromText(self, text: str) -> float:
-        return float(text)
+    def set_int_validator(self, min_value=-1e9, max_value=1e9):
+        validator = QIntValidator(min_value, max_value, self)
+        self.setValidator(validator)
 
-
-# TODO Remove?
-class MySpinBox(QSpinBox):
-
-    def __init__(self):
-        super(MySpinBox, self).__init__()
-        self.labelValue = ""
-
-    def valueFromText(self, text: str):
-        self.setValue(int(text))
+    def set_double_validator(self, min_value=-1e9, max_value=1e9, precision=6):
+        validator = QDoubleValidator(min_value, max_value, precision, self)
+        self.setValidator(validator)
 
 
 # TODO Improve layout
@@ -147,20 +142,22 @@ class ParamWidget(QWidget):
         self.paramLineEdit.textChanged.connect(self.update_description)
         self.paramLineEdit.textChanged.connect(self.update_spinboxes)
 
-        # ---------------- SpinBoxes ------------------------
-        self.reqValLineEdit = MyDoubleSpinBox()
+        # ---------------- LineEdits ------------------------
+        # TODO Improve box lengths
+        self.reqValLineEdit = MyQLineEdit()
         self.reqValLineEdit.setMinimumHeight(25)
         self.reqValLineEdit.setMinimumWidth(110)
+        self.reqValLineEdit.set_double_validator(-1e9, 1e9)
         self.reqValLineEdit.clear()
         self.reqValLineEdit.setReadOnly(True)
 
-        self.rangeLowLineEdit = MyDoubleSpinBox()
+        self.rangeLowLineEdit = MyQLineEdit()
         self.rangeLowLineEdit.setMinimumHeight(25)
         self.rangeLowLineEdit.setMinimumWidth(100)
         self.rangeLowLineEdit.clear()
         self.rangeLowLineEdit.setReadOnly(True)
 
-        self.rangeHighLineEdit = MyDoubleSpinBox()
+        self.rangeHighLineEdit = MyQLineEdit()
         self.rangeHighLineEdit.setMinimumHeight(25)
         self.rangeHighLineEdit.setMinimumWidth(100)
         self.rangeHighLineEdit.clear()
@@ -171,43 +168,43 @@ class ParamWidget(QWidget):
         # myFont.setUnderline(True)
         myFont.setBold(True)
 
+        spacerValue = 23
+
         paramNameLabel = QLabel("Parameter Name")
         paramNameLabel.setFont(myFont)
         paramNameLabel.setBuddy(self.paramLineEdit)
         paramNameLayout = QVBoxLayout()
         paramNameLayout.addWidget(paramNameLabel)
         paramNameLayout.addWidget(self.paramLineEdit)
-        paramNameLayout.addSpacing(23)
+        paramNameLayout.addSpacing(spacerValue)
 
         reqValueLabel = QLabel("Required Value")
         reqValueLabel.setBuddy(self.reqValLineEdit)
         reqValueLabel.setFont(myFont)
-        self.defaultLabel = QLabel(f"Def: {self.reqValLineEdit.labelValue}")
+        self.incrLabel = QLabel("Incr:")
         # reqValueLabel.setMaximumWidth(115)
         reqValueLayout = QVBoxLayout()
         reqValueLayout.addWidget(reqValueLabel)
         reqValueLayout.addWidget(self.reqValLineEdit)
-        reqValueLayout.addWidget(self.defaultLabel)
+        reqValueLayout.addWidget(self.incrLabel)
 
         lowerRangeLabel = QLabel("Lower Range")
         lowerRangeLabel.setBuddy(self.rangeLowLineEdit)
         lowerRangeLabel.setFont(myFont)
-        self.minValueLabel = QLabel(f"Min: {self.rangeLowLineEdit.labelValue}")
         # lowerRangeLabel.setMaximumWidth(100)
         lowerRangeLayout = QVBoxLayout()
         lowerRangeLayout.addWidget(lowerRangeLabel)
         lowerRangeLayout.addWidget(self.rangeLowLineEdit)
-        lowerRangeLayout.addWidget(self.minValueLabel)
+        lowerRangeLayout.addSpacing(spacerValue)
 
         higherRangeLabel = QLabel("Upper Range")
         higherRangeLabel.setBuddy(self.rangeHighLineEdit)
         higherRangeLabel.setFont(myFont)
-        self.maxValueLabel = QLabel(f"Max: {self.rangeHighLineEdit.labelValue}")
         # higherRangeLabel.setMaximumWidth(100)
         higherRangeLayout = QVBoxLayout()
         higherRangeLayout.addWidget(higherRangeLabel)
         higherRangeLayout.addWidget(self.rangeHighLineEdit)
-        higherRangeLayout.addWidget(self.maxValueLabel)
+        higherRangeLayout.addSpacing(spacerValue)
 
         addBtnFont = QFont()
         addBtnFont.setPointSize(10)
@@ -218,9 +215,9 @@ class ParamWidget(QWidget):
         self.addBtn.clicked.connect(self.add_entry)
 
         addBtnLayout = QVBoxLayout()
-        addBtnLayout.addSpacing(23)
+        addBtnLayout.addSpacing(spacerValue)
         addBtnLayout.addWidget(self.addBtn)
-        addBtnLayout.addSpacing(23)
+        addBtnLayout.addSpacing(spacerValue)
 
         headerLayout = QHBoxLayout()
         # headerLayout.addSpacing(20)
@@ -323,9 +320,9 @@ class ParamWidget(QWidget):
         self.paramTableView.setSortingEnabled(False)
         self.paramTableView.insertRow(0)
         self.paramTableView.setItem(0, 0, QTableWidgetItem(self.paramLineEdit.text()))
-        self.paramTableView.setItem(0, 1, QTableWidgetItem(str(self.reqValLineEdit.value())))
-        self.paramTableView.setItem(0, 2, QTableWidgetItem(str(self.rangeLowLineEdit.value())))
-        self.paramTableView.setItem(0, 3, QTableWidgetItem(str(self.rangeHighLineEdit.value())))
+        self.paramTableView.setItem(0, 1, QTableWidgetItem(self.reqValLineEdit.text()))
+        self.paramTableView.setItem(0, 2, QTableWidgetItem(self.rangeLowLineEdit.text()))
+        self.paramTableView.setItem(0, 3, QTableWidgetItem(self.rangeHighLineEdit.text()))
         self.paramTableView.setSortingEnabled(True)
 
     def edit_entry(self):
@@ -357,29 +354,40 @@ class ParamWidget(QWidget):
             self.descriptionBox.setText("")
 
     @staticmethod
-    def set_spinbox_details(spinbox: MyDoubleSpinBox, parameter_name: str, label_type: str):
-        # FIXME If Min/Max is NaN it doesn't work (maybe it shouldn't)
-        # FIXME if Incr is NaN it's even worse
-        # TODO Perhaps instead of spinbox use LineEdit and display Incr, more responsibility on user
-        spinbox.setRange(ParamWidget._paramList.loc[parameter_name, "Min"],
-                         ParamWidget._paramList.loc[parameter_name, "Max"])
-        spinbox.setSingleStep(ParamWidget._paramList.loc[parameter_name, "Incr"])
-        spinbox.labelValue = ParamWidget._paramList.loc[parameter_name, label_type]
+    def set_spinbox_details(spinbox: MyQLineEdit, parameter_name: str, label_argument: str):
+        min_value = -1e9
+        max_value = 1e9
+        precision = 6
+        if not isnan(ParamWidget._paramList.loc[parameter_name, "Min"]):
+            min_value = ParamWidget._paramList.loc[parameter_name, "Min"]
+        if not isnan(ParamWidget._paramList.loc[parameter_name, "Max"]):
+            max_value = ParamWidget._paramList.loc[parameter_name, "Max"]
+        if not isnan(ParamWidget._paramList.loc[parameter_name, "Incr"]):
+            try:
+                _, decimals = str(ParamWidget._paramList.loc[parameter_name, "Incr"]).split('.')
+                precision = len(decimals)
+            except ValueError:
+                precision = 0
+        if ParamWidget._paramList.loc[parameter_name, "Type"] == "INT32":
+            spinbox.set_int_validator(min_value, max_value)
+        else:
+            spinbox.set_double_validator(min_value, max_value, precision)
+
+        spinbox.setPlaceholderText(f"{label_argument}: {ParamWidget._paramList.loc[parameter_name, label_argument]}")
         spinbox.clear()
         spinbox.setReadOnly(False)
 
     @staticmethod
-    def clear_spinbox_details(spinbox: MyDoubleSpinBox):
-        spinbox.labelValue = ""
+    def clear_spinbox_details(spinbox: MyQLineEdit):
+        spinbox.setPlaceholderText("")
         spinbox.clear()
         spinbox.setReadOnly(True)
 
     @staticmethod
-    def unknown_spinbox_details(spinbox: MyDoubleSpinBox):
+    def unknown_spinbox_details(spinbox: MyQLineEdit):
         spinbox.clear()
-        spinbox.setRange(-inf, inf)
-        spinbox.setSingleStep(1e-5)
-        spinbox.labelValue = ""
+        spinbox.set_double_validator()
+        spinbox.setPlaceholderText("Unknown")
         spinbox.clear()
         spinbox.setReadOnly(False)
 
@@ -387,27 +395,24 @@ class ParamWidget(QWidget):
         if self.paramLineEdit.text() in ParamWidget._paramList["Name"]:
             parameter_name = self.paramLineEdit.text()
             self.set_spinbox_details(self.reqValLineEdit, parameter_name, "Default")
-            self.defaultLabel.setText(f"Def: {self.reqValLineEdit.labelValue}")
             self.set_spinbox_details(self.rangeLowLineEdit, parameter_name, "Min")
-            self.minValueLabel.setText(f"Min: {self.rangeLowLineEdit.labelValue}")
             self.set_spinbox_details(self.rangeHighLineEdit, parameter_name, "Max")
-            self.maxValueLabel.setText(f"Max: {self.rangeHighLineEdit.labelValue}")
+            self.incrLabel.setText(f"Incr: {ParamWidget._paramList.loc[parameter_name, 'Incr']}")
         elif len(self.paramLineEdit.text().strip()) != 0:
             self.unknown_spinbox_details(self.reqValLineEdit)
-            self.defaultLabel.setText(f"Def: {self.reqValLineEdit.labelValue}")
             self.unknown_spinbox_details(self.rangeLowLineEdit)
-            self.minValueLabel.setText(f"Min: {self.rangeLowLineEdit.labelValue}")
             self.unknown_spinbox_details(self.rangeHighLineEdit)
-            self.maxValueLabel.setText(f"Max: {self.rangeHighLineEdit.labelValue}")
+            self.incrLabel.setText("Incr:")
         else:
             self.clear_spinbox_details(self.reqValLineEdit)
             self.clear_spinbox_details(self.rangeLowLineEdit)
             self.clear_spinbox_details(self.rangeHighLineEdit)
+            self.incrLabel.setText("Incr:")
         for i in range(self.paramTableView.rowCount()):
             if self.paramLineEdit.text() == self.paramTableView.item(i, 0).text():
-                self.reqValLineEdit.valueFromText(self.paramTableView.item(i, 1).text())
-                self.rangeLowLineEdit.valueFromText(self.paramTableView.item(i, 2).text())
-                self.rangeHighLineEdit.valueFromText(self.paramTableView.item(i, 3).text())
+                self.reqValLineEdit.setText(self.paramTableView.item(i, 1).text())
+                self.rangeLowLineEdit.setText(self.paramTableView.item(i, 2).text())
+                self.rangeHighLineEdit.setText(self.paramTableView.item(i, 3).text())
                 return
 
     def select_row(self):
