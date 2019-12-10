@@ -8,7 +8,7 @@ from PySide2.QtWidgets import (QDialog, QApplication, QWidget, QVBoxLayout, QPus
 from numpy import isnan
 
 from full_param_list_html_parser import load_param_df
-from load_critical_parameters import read_critical_parameters
+from load_critical_parameters import read_critical_parameters, write_critical_parameters
 
 
 class App(QDialog):
@@ -84,6 +84,7 @@ class App(QDialog):
         closeBtn.setShortcut("Ctrl+Q")
 
         applyBtn = QPushButton("Apply")
+        applyBtn.clicked.connect(self.addEntryWidget.export_parameters)
 
         bottomLayout = QHBoxLayout()
         bottomLayout.addStretch(1)
@@ -147,7 +148,7 @@ class ParamWidget(QWidget):
         self.reqValLineEdit = MyQLineEdit()
         self.reqValLineEdit.setMinimumHeight(25)
         self.reqValLineEdit.setMinimumWidth(110)
-        self.reqValLineEdit.set_double_validator(-1e9, 1e9)
+        self.reqValLineEdit.set_double_validator(min_value=-1e9, max_value=1e9)
         self.reqValLineEdit.clear()
         self.reqValLineEdit.setReadOnly(True)
         self.reqValLineEdit.textChanged.connect(self.disable_range_boxes)
@@ -182,7 +183,6 @@ class ParamWidget(QWidget):
         reqValueLabel.setBuddy(self.reqValLineEdit)
         reqValueLabel.setFont(myFont)
         self.incrLabel = QLabel("Incr:")
-        # reqValueLabel.setMaximumWidth(100)
         reqValueLayout = QVBoxLayout()
         reqValueLayout.addWidget(reqValueLabel)
         reqValueLayout.addWidget(self.reqValLineEdit)
@@ -191,7 +191,6 @@ class ParamWidget(QWidget):
         lowerRangeLabel = QLabel("Lower Range")
         lowerRangeLabel.setBuddy(self.rangeLowLineEdit)
         lowerRangeLabel.setFont(myFont)
-        # lowerRangeLabel.setMaximumWidth(90)
         lowerRangeLayout = QVBoxLayout()
         lowerRangeLayout.addWidget(lowerRangeLabel)
         lowerRangeLayout.addWidget(self.rangeLowLineEdit)
@@ -200,7 +199,6 @@ class ParamWidget(QWidget):
         higherRangeLabel = QLabel("Upper Range")
         higherRangeLabel.setBuddy(self.rangeHighLineEdit)
         higherRangeLabel.setFont(myFont)
-        # higherRangeLabel.setMaximumWidth(90)
         higherRangeLayout = QVBoxLayout()
         higherRangeLayout.addWidget(higherRangeLabel)
         higherRangeLayout.addWidget(self.rangeHighLineEdit)
@@ -313,7 +311,7 @@ class ParamWidget(QWidget):
                     break
                 else:
                     return
-        # TODO Add logic to prevent wrong values being filled
+        # TODO Add logic to prevent wrong values being filled (outside of range, lower greater than upper, etc.)
         if len((self.reqValLineEdit.text() + self.rangeLowLineEdit.text() + self.rangeHighLineEdit.text()).strip()) != 0:
             self.paramTableView.setSortingEnabled(False)
             self.paramTableView.insertRow(0)
@@ -339,9 +337,8 @@ class ParamWidget(QWidget):
         choice = QMessageBox.question(self, "Confirm Clear All", "\nClear all entries?",
                                       QMessageBox.Yes, QMessageBox.No)
         if choice == QMessageBox.Yes:
-            self.paramTableView.clearContents()
-            for row in range(self.paramTableView.rowCount()):
-                self.paramTableView.removeRow(row)
+            self.paramTableView.selectAll()
+            self.remove_entry()
 
     def update_description(self):
         if self.paramLineEdit.text() in ParamWidget._paramList["Name"]:
@@ -449,9 +446,44 @@ class ParamWidget(QWidget):
             if len(specified_values) == 1:
                 self.paramTableView.setItem(0, 1, QTableWidgetItem(specified_values[0]))
             else:
-                self.paramTableView.setItem(0, 2, QTableWidgetItem(specified_values[0]))
-                self.paramTableView.setItem(0, 3, QTableWidgetItem(specified_values[1]))
+                self.paramTableView.setItem(0, 1, QTableWidgetItem(''))
+                if "-INFINITY" not in specified_values[0]:
+                    self.paramTableView.setItem(0, 2, QTableWidgetItem(specified_values[0]))
+                else:
+                    self.paramTableView.setItem(0, 2, QTableWidgetItem(''))
+                if "INFINITY" not in specified_values[1]:
+                    self.paramTableView.setItem(0, 3, QTableWidgetItem(specified_values[1]))
+                else:
+                    self.paramTableView.setItem(0, 3, QTableWidgetItem(''))
         self.paramTableView.setSortingEnabled(True)
+
+    def export_parameters(self):
+        crit_params = dict()
+        for i in range(self.paramTableView.rowCount()):
+            values = []
+            if len(self.paramTableView.item(i, 1).text().strip()) != 0:
+                values.append(self.to_numeric(self.paramTableView.item(i, 1).text()))
+                crit_params[self.paramTableView.item(i, 0).text()] = values
+                continue
+            if len(self.paramTableView.item(i, 2).text().strip()) == 0:
+                values.append("-INFINITY")
+            else:
+                values.append(self.to_numeric(self.paramTableView.item(i, 2).text()))
+            if len(self.paramTableView.item(i, 3).text().strip()) == 0:
+                values.append("INFINITY")
+            else:
+                values.append(self.to_numeric(self.paramTableView.item(i, 3).text()))
+            crit_params[self.paramTableView.item(i, 0).text()] = values
+
+        write_critical_parameters(crit_params)
+
+    @staticmethod
+    def to_numeric(s: str):
+        try:
+            num = int(s)
+        except ValueError:
+            num = float(s)
+        return num
 
 
 if __name__ == "__main__":
