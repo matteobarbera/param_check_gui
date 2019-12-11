@@ -29,21 +29,21 @@ class App(QDialog):
 
         self.mainLayout = QVBoxLayout()
 
-        self.create_top_layout()
-        self.create_centre_layout()
-        self.create_bottom_layout()
+        self.createTopLayout()
+        self.createCentreLayout()
+        self.createBottomLayout()
 
-        self.addEntryWidget.changedStatus.connect(self.changes_made)
+        self.addEntryWidget.changedStatus.connect(self.changesMade)
 
         self.setLayout(self.mainLayout)
         self.show()
 
-    def create_top_layout(self):
+    def createTopLayout(self):
         explanationText = QLabel()
         explanationText.setIndent(20)
         explanationText.setText("<font size=4><b>Critical Parameter Generator</b></font>"
                                 "<span style='margin-top: 0px; margin-bottom: 0px;'>"
-                        
+
                                 "<p> This application lets you define the parameters and their corresponding values "
                                 "that will be checked by <i>avy_param_check.cpp</i> in the "
                                 "<span style='font-weight: 500;'> Commander</span> module.</p>"
@@ -67,9 +67,7 @@ class App(QDialog):
 
         self.mainLayout.addLayout(topLayout)
 
-    def create_centre_layout(self):
-        # ==================================================
-
+    def createCentreLayout(self):
         # ---------------- paramEditLayout -----------------
         self.addEntryWidget = ParamWidget()
 
@@ -81,7 +79,8 @@ class App(QDialog):
         centreLayout.addLayout(paramEditLayout)
         self.mainLayout.addLayout(centreLayout)
 
-    def create_bottom_layout(self):
+    def createBottomLayout(self):
+        # -------------- changesMadeFrame -------------------
         changesMadeImage = QPixmap("check_icon.png")
 
         self.changesMadeIcon = QLabel()
@@ -104,16 +103,17 @@ class App(QDialog):
         self.changesMadeFrame.setMinimumWidth(250)
         self.changesMadeFrame.setLayout(changesMadeLayout)
 
+        # -------------- bottomBtnLayout --------------------
         self.okBtn = QPushButton("Ok")
-        self.okBtn.clicked.connect(self.save_and_close)
+        self.okBtn.clicked.connect(self.saveAndClose)
         self.okBtn.setEnabled(False)
 
         closeBtn = QPushButton("Close")
-        closeBtn.clicked.connect(self.confirm_close)
+        closeBtn.clicked.connect(self.confirmClose)
         closeBtn.setShortcut("Ctrl+Q")
 
         self.applyBtn = QPushButton("Apply")
-        self.applyBtn.clicked.connect(self.addEntryWidget.export_parameters)
+        self.applyBtn.clicked.connect(self.addEntryWidget.exportParameters)
         self.applyBtn.setEnabled(False)
 
         bottomBtnLayout = QHBoxLayout()
@@ -128,7 +128,7 @@ class App(QDialog):
 
         self.mainLayout.addLayout(mainBottomLayout)
 
-    def confirm_close(self):
+    def confirmClose(self):
         if self.hasChanged:
             choice = QMessageBox.question(self, "Close Window", "Close application?\nThere are unsaved changes",
                                           QMessageBox.Yes, QMessageBox.No)
@@ -139,12 +139,12 @@ class App(QDialog):
         else:
             sys.exit()
 
-    def save_and_close(self):
-        self.addEntryWidget.export_parameters()
+    def saveAndClose(self):
+        self.addEntryWidget.exportParameters()
         sys.exit()
 
     @Slot(bool)
-    def changes_made(self, changes_made):
+    def changesMade(self, changes_made: bool):
         icon_size = 16
         if changes_made:
             self.hasChanged = True
@@ -177,26 +177,24 @@ class MyQLineEdit(QLineEdit):
         self.defaultStyleSheet = self.styleSheet()
         self.isInputValid = True
 
-    def set_int_validator(self, min_value=validator_default_min, max_value=validator_default_max):
+    def setIntValidator(self, min_value=validator_default_min, max_value=validator_default_max):
         validator = QIntValidator(min_value, max_value, self)
         self.setValidator(validator)
 
-    def set_double_validator(
+    def setDoubleValidator(
             self, min_value=validator_default_min, max_value=validator_default_max, precision=validator_default_prec):
         validator = QDoubleValidator(min_value, max_value, precision, self)
         self.setValidator(validator)
 
-    def input_is_valid(self):
+    def inputIsValid(self):
         self.isInputValid = True
         self.setStyleSheet(self.defaultStyleSheet)
 
-    def input_is_invalid(self):
+    def inputIsInvalid(self):
         self.isInputValid = False
         self.setStyleSheet("QLineEdit { background-color : Salmon; }")
 
 
-# TODO Improve code layout
-# TODO Refactor variables where appropriate
 # TODO Improve minimum widget height/width
 class ParamWidget(QWidget):
 
@@ -207,6 +205,7 @@ class ParamWidget(QWidget):
         super(ParamWidget, self).__init__()
 
         # ===================================================
+        # ---------------- LineEdits ------------------------
         paramNameList = QStringListModel()
         paramNameList.setStringList(ParamWidget._paramList["Name"])
         paramCompleter = QCompleter()
@@ -217,34 +216,33 @@ class ParamWidget(QWidget):
         self.paramLineEdit.setCompleter(paramCompleter)
         self.paramLineEdit.setMinimumHeight(25)
 
-        self.paramLineEdit.textChanged.connect(self.update_description)
-        self.paramLineEdit.textChanged.connect(self.update_spinboxes)
+        self.paramLineEdit.textChanged.connect(self.updateDescription)
+        self.paramLineEdit.textChanged.connect(self.updateSpinboxes)
 
-        # ---------------- LineEdits ------------------------
         self.reqValLineEdit = MyQLineEdit()
         self.reqValLineEdit.setMinimumHeight(25)
         self.reqValLineEdit.setMinimumWidth(110)
-        self.reqValLineEdit.set_double_validator(MyQLineEdit.validator_default_min, MyQLineEdit.validator_default_max)
+        self.reqValLineEdit.setDoubleValidator(MyQLineEdit.validator_default_min, MyQLineEdit.validator_default_max)
         self.reqValLineEdit.clear()
         self.reqValLineEdit.setReadOnly(True)
-        self.reqValLineEdit.textChanged.connect(self.disable_range_boxes)
-        self.reqValLineEdit.textChanged.connect(self.check_valid)
+        self.reqValLineEdit.textChanged.connect(self.disableRangeBoxes)
+        self.reqValLineEdit.textChanged.connect(self.checkValid)
 
         self.rangeLowLineEdit = MyQLineEdit()
         self.rangeLowLineEdit.setMinimumHeight(25)
         self.rangeLowLineEdit.setMinimumWidth(100)
         self.rangeLowLineEdit.clear()
         self.rangeLowLineEdit.setReadOnly(True)
-        self.rangeLowLineEdit.textChanged.connect(self.check_valid)
+        self.rangeLowLineEdit.textChanged.connect(self.checkValid)
 
         self.rangeHighLineEdit = MyQLineEdit()
         self.rangeHighLineEdit.setMinimumHeight(25)
         self.rangeHighLineEdit.setMinimumWidth(100)
         self.rangeHighLineEdit.clear()
         self.rangeHighLineEdit.setReadOnly(True)
-        self.rangeHighLineEdit.textChanged.connect(self.check_valid)
+        self.rangeHighLineEdit.textChanged.connect(self.checkValid)
 
-        # ---------------- headerLayout ---------------------
+        # ---------------- paramInputLayout -----------------
         myFont = QFont()
         myFont.setBold(True)
 
@@ -289,19 +287,19 @@ class ParamWidget(QWidget):
         self.addBtn.setFont(addBtnFont)
         self.addBtn.setMaximumHeight(23)
         self.addBtn.setIcon(QIcon("plus_icon.png"))
-        self.addBtn.clicked.connect(self.add_entry)
+        self.addBtn.clicked.connect(self.addEntry)
 
         addBtnLayout = QVBoxLayout()
         addBtnLayout.addSpacing(spacerValue)
         addBtnLayout.addWidget(self.addBtn)
         addBtnLayout.addSpacing(spacerValue)
 
-        headerLayout = QHBoxLayout()
-        headerLayout.addLayout(paramNameLayout)
-        headerLayout.addLayout(reqValueLayout)
-        headerLayout.addLayout(lowerRangeLayout)
-        headerLayout.addLayout(higherRangeLayout)
-        headerLayout.addLayout(addBtnLayout)
+        paramInputLayout = QHBoxLayout()
+        paramInputLayout.addLayout(paramNameLayout)
+        paramInputLayout.addLayout(reqValueLayout)
+        paramInputLayout.addLayout(lowerRangeLayout)
+        paramInputLayout.addLayout(higherRangeLayout)
+        paramInputLayout.addLayout(addBtnLayout)
 
         # ---------------- descriptionBox -------------------
         self.descriptionBox = QTextBrowser()
@@ -310,34 +308,34 @@ class ParamWidget(QWidget):
         self.descriptionBox.setAcceptRichText(True)
         self.descriptionBox.setStyleSheet("background-color: rgb(240,240,240)")
 
-        # ---------------- paramTableView --------------------
-        self.paramTableView = QTableWidget(0, 4)
-        self.paramTableView.setHorizontalHeaderLabels(["Parameter Name", "Required", "Minimum", "Maximum"])
-        self.paramTableView.setSortingEnabled(True)
-        self.paramTableView.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.paramTableView.setShowGrid(False)
-        self.paramTableView.setAlternatingRowColors(True)
-        self.paramTableView.setSelectionBehavior(QTableWidget.SelectRows)
-        self.paramTableView.verticalHeader().setDefaultSectionSize(25)
-        self.paramTableView.setStyleSheet("alternate-background-color: LightSteelBlue")
-        self.paramTableView.itemPressed.connect(self.select_row)
-        self.load_parameters()
+        # ------------------ tableLayout --------------------
+        self.paramTable = QTableWidget(0, 4)
+        self.paramTable.setHorizontalHeaderLabels(["Parameter Name", "Required", "Minimum", "Maximum"])
+        self.paramTable.setSortingEnabled(True)
+        self.paramTable.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.paramTable.setShowGrid(False)
+        self.paramTable.setAlternatingRowColors(True)
+        self.paramTable.setSelectionBehavior(QTableWidget.SelectRows)
+        self.paramTable.verticalHeader().setDefaultSectionSize(25)
+        self.paramTable.setStyleSheet("alternate-background-color: LightSteelBlue")
+        self.paramTable.itemPressed.connect(self.selectRow)
+        self.loadParameters()
 
-        self.paramTableHeader = self.paramTableView.horizontalHeader()
+        self.paramTableHeader = self.paramTable.horizontalHeader()
         self.paramTableHeader.setSectionResizeMode(0, QHeaderView.Stretch)
 
         self.removeEntryBtn = QPushButton()
         self.removeEntryBtn.setIcon(QIcon("minus_icon.png"))
         self.removeEntryBtn.setFlat(True)
         self.removeEntryBtn.setMaximumSize(20, 20)
-        self.removeEntryBtn.clicked.connect(self.remove_entry)
+        self.removeEntryBtn.clicked.connect(self.removeEntry)
 
         self.editEntryBtn = QPushButton()
         self.editEntryBtn.setIcon(QIcon("edit_icon.png"))
         self.editEntryBtn.setFlat(True)
         self.editEntryBtn.setMaximumSize(20, 20)
         self.editEntryBtn.setEnabled(False)
-        self.editEntryBtn.clicked.connect(self.edit_entry)
+        self.editEntryBtn.clicked.connect(self.editEntry)
 
         sideBtnLayout = QVBoxLayout()
         sideBtnLayout.addWidget(self.removeEntryBtn)
@@ -351,166 +349,174 @@ class ParamWidget(QWidget):
         btnFrame.setLayout(sideBtnLayout)
 
         tableLayout = QHBoxLayout()
-        tableLayout.addWidget(self.paramTableView)
+        tableLayout.addWidget(self.paramTable)
         tableLayout.addWidget(btnFrame)
 
         # ---------------- clearEntryBtn --------------------
         clearEntryBtn = QPushButton("Clear All")
         clearEntryBtn.setIcon(QIcon("minus_icon.png"))
-        clearEntryBtn.clicked.connect(self.remove_all_entries)
+        clearEntryBtn.clicked.connect(self.removeAllEntries)
 
         # ===================================================
         layout = QVBoxLayout()
-        layout.addLayout(headerLayout)
+        layout.addLayout(paramInputLayout)
         layout.addWidget(self.descriptionBox)
         layout.addLayout(tableLayout)
         layout.addWidget(clearEntryBtn)
         self.setLayout(layout)
 
-    def add_entry(self):
+    def addEntry(self):
         if self.paramLineEdit.text() in ParamWidget._paramList["Name"]:
-            self.add_row()
+            self.addRow()
         elif len(self.paramLineEdit.text().strip()) != 0:
             choice = QMessageBox.question(self, "Unknown parameter",
                                           "The parameter is not in the Full Parameter List"
                                           "\nAre you sure you want to add it? PX4 might crash",
                                           QMessageBox.Yes, QMessageBox.No)
             if choice == QMessageBox.Yes:
-                self.add_row()
+                self.addRow()
 
-    def add_row(self):
-        if not (self.reqValLineEdit.isInputValid and self.rangeLowLineEdit.isInputValid and
-                self.rangeHighLineEdit.isInputValid):
+    def addRow(self):
+        if not (self.reqValLineEdit.isInputValid and self.rangeLowLineEdit.isInputValid
+                and self.rangeHighLineEdit.isInputValid):
             choice = QMessageBox.question(self, "Warning",
                                           "One of the specified values is outside the expected valid ranges."
                                           "\nAre you sure you want to add this parameter to the table?",
                                           QMessageBox.Yes, QMessageBox.No)
             if choice == QMessageBox.No:
                 return
-        for i in range(self.paramTableView.rowCount()):
-            if self.paramLineEdit.text() == self.paramTableView.item(i, 0).text():
+        for i in range(self.paramTable.rowCount()):
+            if self.paramLineEdit.text() == self.paramTable.item(i, 0).text():
                 choice = QMessageBox.question(self, "Warning",
                                               f"{self.paramLineEdit.text()} has already been specified."
                                               f"\nDo you want to overwrite it?",
                                               QMessageBox.Yes, QMessageBox.No)
                 if choice == QMessageBox.Yes:
-                    self.paramTableView.removeRow(i)
+                    self.paramTable.removeRow(i)
                     break
                 else:
                     return
-        if len((self.reqValLineEdit.text().strip(" -") + self.rangeLowLineEdit.text().strip(" -") +
-                self.rangeHighLineEdit.text()).strip(" -")) != 0:
-            self.paramTableView.setSortingEnabled(False)
-            self.paramTableView.insertRow(0)
-            self.paramTableView.setItem(0, 0, QTableWidgetItem(self.paramLineEdit.text()))
-            self.paramTableView.setItem(0, 1, QTableWidgetItem(self.reqValLineEdit.text()))
+        if len((self.reqValLineEdit.text().strip(" -") + self.rangeLowLineEdit.text().strip(" -")
+                + self.rangeHighLineEdit.text()).strip(" -")) != 0:
+            self.paramTable.setSortingEnabled(False)
+            self.paramTable.insertRow(0)
+            self.paramTable.setItem(0, 0, QTableWidgetItem(self.paramLineEdit.text()))
+            self.paramTable.setItem(0, 1, QTableWidgetItem(self.reqValLineEdit.text()))
             if self.rangeLowLineEdit.isEnabled() and self.rangeHighLineEdit.isEnabled():
-                self.paramTableView.setItem(0, 2, QTableWidgetItem(self.rangeLowLineEdit.text()))
-                self.paramTableView.setItem(0, 3, QTableWidgetItem(self.rangeHighLineEdit.text()))
-            self.paramTableView.setSortingEnabled(True)
+                self.paramTable.setItem(0, 2, QTableWidgetItem(self.rangeLowLineEdit.text()))
+                self.paramTable.setItem(0, 3, QTableWidgetItem(self.rangeHighLineEdit.text()))
+            self.paramTable.setSortingEnabled(True)
             self.paramLineEdit.clear()
         self.changedStatus.emit(True)
 
-    def edit_entry(self):
-        row_index = self.paramTableView.currentRow()
-        self.paramLineEdit.setText(self.paramTableView.item(row_index, 0).text())
+    def editEntry(self):
+        row_index = self.paramTable.currentRow()
+        self.paramLineEdit.setText(self.paramTable.item(row_index, 0).text())
 
-    def remove_entry(self):
-        selection = self.paramTableView.selectionModel().selectedRows()
+    def removeEntry(self):
+        selection = self.paramTable.selectionModel().selectedRows()
         indices = sorted([index.row() for index in selection], reverse=True)
         for index in indices:
-            self.paramTableView.removeRow(index)
+            self.paramTable.removeRow(index)
         self.changedStatus.emit(True)
 
-    def remove_all_entries(self):
+    def removeAllEntries(self):
         choice = QMessageBox.question(self, "Confirm Clear All", "\nClear all entries?",
                                       QMessageBox.Yes, QMessageBox.No)
         if choice == QMessageBox.Yes:
-            self.paramTableView.selectAll()
-            self.remove_entry()
+            self.paramTable.selectAll()
+            self.removeEntry()
 
-    def update_description(self):
+    def selectRow(self):
+        selection = self.paramTable.selectionModel().selectedRows()
+        # Only one parameter at a time can be edited
+        if len(selection) == 0 or len(selection) > 1:
+            self.editEntryBtn.setEnabled(False)
+        else:
+            self.editEntryBtn.setEnabled(True)
+
+    def updateDescription(self):
         if self.paramLineEdit.text() in ParamWidget._paramList["Name"]:
             parameter_name = self.paramLineEdit.text()
             self.descriptionBox.setText(ParamWidget._paramList.loc[parameter_name, "Description"])
         elif len(self.paramLineEdit.text().strip()) != 0:
-            warning_text = "<b>Warning</b>: Parameter not in Full Parameter List "
+            warning_text = "<b>Warning</b>: Parameter not in Full Parameter List"
             self.descriptionBox.setText(warning_text)
         else:
             self.descriptionBox.setText("")
 
     @staticmethod
-    def set_spinbox_details(spinbox: MyQLineEdit, parameter_name: str, label_argument: str):
+    def setSpinboxDetails(lineEdit_: MyQLineEdit, parameterName: str, labelArgument: str):
         min_value = MyQLineEdit.validator_default_min
         max_value = MyQLineEdit.validator_default_max
         precision = MyQLineEdit.validator_default_prec
-        if not isnan(ParamWidget._paramList.loc[parameter_name, "Min"]):
-            min_value = ParamWidget._paramList.loc[parameter_name, "Min"]
-        if not isnan(ParamWidget._paramList.loc[parameter_name, "Max"]):
-            max_value = ParamWidget._paramList.loc[parameter_name, "Max"]
-        if not isnan(ParamWidget._paramList.loc[parameter_name, "Incr"]):
+        if not isnan(ParamWidget._paramList.loc[parameterName, "Min"]):
+            min_value = ParamWidget._paramList.loc[parameterName, "Min"]
+        if not isnan(ParamWidget._paramList.loc[parameterName, "Max"]):
+            max_value = ParamWidget._paramList.loc[parameterName, "Max"]
+        if not isnan(ParamWidget._paramList.loc[parameterName, "Incr"]):
             try:
-                _, decimals = str(ParamWidget._paramList.loc[parameter_name, "Incr"]).split('.')
+                _, decimals = str(ParamWidget._paramList.loc[parameterName, "Incr"]).split(".")
                 precision = len(decimals)
             except ValueError:
                 precision = 0
-        if ParamWidget._paramList.loc[parameter_name, "Type"] == "INT32":
-            spinbox.set_int_validator(min_value, max_value)
-            if not isnan(ParamWidget._paramList.loc[parameter_name, label_argument]):
-                spinbox.setPlaceholderText(
-                    f"{label_argument}: {round(float(ParamWidget._paramList.loc[parameter_name, label_argument]))}")
+        if ParamWidget._paramList.loc[parameterName, "Type"] == "INT32":
+            lineEdit_.setIntValidator(min_value, max_value)
+            if not isnan(ParamWidget._paramList.loc[parameterName, labelArgument]):
+                lineEdit_.setPlaceholderText(
+                    f"{labelArgument}: {round(float(ParamWidget._paramList.loc[parameterName, labelArgument]))}")
             else:
-                spinbox.setPlaceholderText(
-                    f"{label_argument}: {ParamWidget._paramList.loc[parameter_name, label_argument]}")
+                lineEdit_.setPlaceholderText(
+                    f"{labelArgument}: {ParamWidget._paramList.loc[parameterName, labelArgument]}")
         else:
-            spinbox.set_double_validator(min_value, max_value, precision)
-            spinbox.setPlaceholderText(
-                f"{label_argument}: {ParamWidget._paramList.loc[parameter_name, label_argument]}")
-        spinbox.clear()
-        spinbox.setReadOnly(False)
+            lineEdit_.setDoubleValidator(min_value, max_value, precision)
+            lineEdit_.setPlaceholderText(
+                f"{labelArgument}: {ParamWidget._paramList.loc[parameterName, labelArgument]}")
+        lineEdit_.clear()
+        lineEdit_.setReadOnly(False)
 
     @staticmethod
-    def clear_spinbox_details(spinbox: MyQLineEdit):
-        spinbox.setPlaceholderText("")
-        spinbox.clear()
-        spinbox.setReadOnly(True)
+    def clearSpinboxDetails(lineEdit_: MyQLineEdit):
+        lineEdit_.setPlaceholderText("")
+        lineEdit_.clear()
+        lineEdit_.setReadOnly(True)
 
     @staticmethod
-    def unknown_spinbox_details(spinbox: MyQLineEdit):
-        spinbox.clear()
-        spinbox.set_double_validator()
-        spinbox.setPlaceholderText("Unknown")
-        spinbox.clear()
-        spinbox.setReadOnly(False)
+    def setUnknownSpinboxDetails(lineEdit_: MyQLineEdit):
+        lineEdit_.clear()
+        lineEdit_.setDoubleValidator()
+        lineEdit_.setPlaceholderText("Unknown")
+        lineEdit_.clear()
+        lineEdit_.setReadOnly(False)
 
-    def update_spinboxes(self):
+    def updateSpinboxes(self):
         if self.paramLineEdit.text() in ParamWidget._paramList["Name"]:
             parameter_name = self.paramLineEdit.text()
-            self.set_spinbox_details(self.reqValLineEdit, parameter_name, "Default")
-            self.set_spinbox_details(self.rangeLowLineEdit, parameter_name, "Min")
-            self.set_spinbox_details(self.rangeHighLineEdit, parameter_name, "Max")
+            self.setSpinboxDetails(self.reqValLineEdit, parameter_name, "Default")
+            self.setSpinboxDetails(self.rangeLowLineEdit, parameter_name, "Min")
+            self.setSpinboxDetails(self.rangeHighLineEdit, parameter_name, "Max")
             self.incrLabel.setText(f"Incr: {ParamWidget._paramList.loc[parameter_name, 'Incr']}")
         elif len(self.paramLineEdit.text().strip()) != 0:
-            self.unknown_spinbox_details(self.reqValLineEdit)
-            self.unknown_spinbox_details(self.rangeLowLineEdit)
-            self.unknown_spinbox_details(self.rangeHighLineEdit)
+            self.setUnknownSpinboxDetails(self.reqValLineEdit)
+            self.setUnknownSpinboxDetails(self.rangeLowLineEdit)
+            self.setUnknownSpinboxDetails(self.rangeHighLineEdit)
             self.incrLabel.setText("Incr:")
         else:
-            self.clear_spinbox_details(self.reqValLineEdit)
-            self.clear_spinbox_details(self.rangeLowLineEdit)
-            self.clear_spinbox_details(self.rangeHighLineEdit)
+            self.clearSpinboxDetails(self.reqValLineEdit)
+            self.clearSpinboxDetails(self.rangeLowLineEdit)
+            self.clearSpinboxDetails(self.rangeHighLineEdit)
             self.incrLabel.setText("Incr:")
-        for i in range(self.paramTableView.rowCount()):
-            if self.paramLineEdit.text() == self.paramTableView.item(i, 0).text():
-                if self.paramTableView.item(i, 1) is not None:
-                    self.reqValLineEdit.setText(self.paramTableView.item(i, 1).text())
-                if self.paramTableView.item(i, 2) is not None:
-                    self.rangeLowLineEdit.setText(self.paramTableView.item(i, 2).text())
-                if self.paramTableView.item(i, 3) is not None:
-                    self.rangeHighLineEdit.setText(self.paramTableView.item(i, 3).text())
+        for i in range(self.paramTable.rowCount()):
+            if self.paramLineEdit.text() == self.paramTable.item(i, 0).text():
+                if self.paramTable.item(i, 1) is not None:
+                    self.reqValLineEdit.setText(self.paramTable.item(i, 1).text())
+                if self.paramTable.item(i, 2) is not None:
+                    self.rangeLowLineEdit.setText(self.paramTable.item(i, 2).text())
+                if self.paramTable.item(i, 3) is not None:
+                    self.rangeHighLineEdit.setText(self.paramTable.item(i, 3).text())
                 return
 
-    def disable_range_boxes(self):
+    def disableRangeBoxes(self):
         if self.reqValLineEdit.text() != "":
             self.rangeLowLineEdit.setDisabled(True)
             self.rangeHighLineEdit.setDisabled(True)
@@ -518,92 +524,84 @@ class ParamWidget(QWidget):
             self.rangeLowLineEdit.setDisabled(False)
             self.rangeHighLineEdit.setDisabled(False)
 
-    def check_valid(self):
-        min_val = MyQLineEdit.validator_default_min
-        max_val = MyQLineEdit.validator_default_max
+    def checkValid(self):
+        minVal = MyQLineEdit.validator_default_min
+        maxVal = MyQLineEdit.validator_default_max
         if self.paramLineEdit.text() in ParamWidget._paramList["Name"]:
             parameterName = self.paramLineEdit.text()
             if not isnan(ParamWidget._paramList.loc[parameterName, "Min"]):
-                min_val = ParamWidget._paramList.loc[parameterName, "Min"]
+                minVal = ParamWidget._paramList.loc[parameterName, "Min"]
             if not isnan(ParamWidget._paramList.loc[parameterName, "Max"]):
-                max_val = ParamWidget._paramList.loc[parameterName, "Max"]
+                maxVal = ParamWidget._paramList.loc[parameterName, "Max"]
 
         if len(self.reqValLineEdit.text().strip("- ")) != 0:
-            reqVal = self.to_numeric(self.reqValLineEdit.text())
-            if reqVal < min_val or reqVal > max_val:
-                self.reqValLineEdit.input_is_invalid()
+            reqVal = self._toNumeric(self.reqValLineEdit.text())
+            if reqVal < minVal or reqVal > maxVal:
+                self.reqValLineEdit.inputIsInvalid()
             else:
-                self.reqValLineEdit.input_is_valid()
+                self.reqValLineEdit.inputIsValid()
         else:
-            self.reqValLineEdit.input_is_valid()
+            self.reqValLineEdit.inputIsValid()
 
-        lowVal = min_val
-        uppVal = max_val
+        lowVal = minVal
+        uppVal = maxVal
         if len(self.rangeLowLineEdit.text().strip(" -")) != 0:
-            lowVal = self.to_numeric(self.rangeLowLineEdit.text())
+            lowVal = self._toNumeric(self.rangeLowLineEdit.text())
         if len(self.rangeHighLineEdit.text().strip(" -")) != 0:
-            uppVal = self.to_numeric(self.rangeHighLineEdit.text())
+            uppVal = self._toNumeric(self.rangeHighLineEdit.text())
 
-        if lowVal < min_val or lowVal > max_val or lowVal > uppVal:
-            self.rangeLowLineEdit.input_is_invalid()
+        if lowVal < minVal or lowVal > maxVal or lowVal > uppVal:
+            self.rangeLowLineEdit.inputIsInvalid()
         else:
-            self.rangeLowLineEdit.input_is_valid()
-        if uppVal < min_val or uppVal > max_val or uppVal < lowVal:
-            self.rangeHighLineEdit.input_is_invalid()
+            self.rangeLowLineEdit.inputIsValid()
+        if uppVal < minVal or uppVal > maxVal or uppVal < lowVal:
+            self.rangeHighLineEdit.inputIsInvalid()
         else:
-            self.rangeHighLineEdit.input_is_valid()
+            self.rangeHighLineEdit.inputIsValid()
 
-    def select_row(self):
-        selection = self.paramTableView.selectionModel().selectedRows()
-        # Only one parameter at a time can be edited
-        if len(selection) == 0 or len(selection) > 1:
-            self.editEntryBtn.setEnabled(False)
-        else:
-            self.editEntryBtn.setEnabled(True)
-
-    def load_parameters(self):
-        h_file_parameters = read_critical_parameters()
-        self.paramTableView.setSortingEnabled(False)
-        for param_name, specified_values in h_file_parameters.items():
-            self.paramTableView.insertRow(0)
-            self.paramTableView.setItem(0, 0, QTableWidgetItem(param_name))
-            if len(specified_values) == 1:
-                self.paramTableView.setItem(0, 1, QTableWidgetItem(specified_values[0]))
+    def loadParameters(self):
+        hFileParameters = read_critical_parameters()
+        self.paramTable.setSortingEnabled(False)
+        for paramName, specifiedValues in hFileParameters.items():
+            self.paramTable.insertRow(0)
+            self.paramTable.setItem(0, 0, QTableWidgetItem(paramName))
+            if len(specifiedValues) == 1:
+                self.paramTable.setItem(0, 1, QTableWidgetItem(specifiedValues[0]))
             else:
-                self.paramTableView.setItem(0, 1, QTableWidgetItem(''))
-                if "-INFINITY" not in specified_values[0]:
-                    self.paramTableView.setItem(0, 2, QTableWidgetItem(specified_values[0]))
+                self.paramTable.setItem(0, 1, QTableWidgetItem(""))
+                if "-INFINITY" not in specifiedValues[0]:
+                    self.paramTable.setItem(0, 2, QTableWidgetItem(specifiedValues[0]))
                 else:
-                    self.paramTableView.setItem(0, 2, QTableWidgetItem(''))
-                if "INFINITY" not in specified_values[1]:
-                    self.paramTableView.setItem(0, 3, QTableWidgetItem(specified_values[1]))
+                    self.paramTable.setItem(0, 2, QTableWidgetItem(""))
+                if "INFINITY" not in specifiedValues[1]:
+                    self.paramTable.setItem(0, 3, QTableWidgetItem(specifiedValues[1]))
                 else:
-                    self.paramTableView.setItem(0, 3, QTableWidgetItem(''))
-        self.paramTableView.setSortingEnabled(True)
+                    self.paramTable.setItem(0, 3, QTableWidgetItem(""))
+        self.paramTable.setSortingEnabled(True)
 
-    def export_parameters(self):
-        crit_params = dict()
-        for i in range(self.paramTableView.rowCount()):
+    def exportParameters(self):
+        critParams = dict()
+        for i in range(self.paramTable.rowCount()):
             values = []
-            if len(self.paramTableView.item(i, 1).text().strip()) != 0:
-                values.append(self.to_numeric(self.paramTableView.item(i, 1).text()))
-                crit_params[self.paramTableView.item(i, 0).text()] = values
+            if len(self.paramTable.item(i, 1).text().strip()) != 0:
+                values.append(self._toNumeric(self.paramTable.item(i, 1).text()))
+                critParams[self.paramTable.item(i, 0).text()] = values
                 continue
-            if len(self.paramTableView.item(i, 2).text().strip()) == 0:
+            if len(self.paramTable.item(i, 2).text().strip()) == 0:
                 values.append("-INFINITY")
             else:
-                values.append(self.to_numeric(self.paramTableView.item(i, 2).text()))
-            if len(self.paramTableView.item(i, 3).text().strip()) == 0:
+                values.append(self._toNumeric(self.paramTable.item(i, 2).text()))
+            if len(self.paramTable.item(i, 3).text().strip()) == 0:
                 values.append("INFINITY")
             else:
-                values.append(self.to_numeric(self.paramTableView.item(i, 3).text()))
-            crit_params[self.paramTableView.item(i, 0).text()] = values
+                values.append(self._toNumeric(self.paramTable.item(i, 3).text()))
+            critParams[self.paramTable.item(i, 0).text()] = values
 
-        write_critical_parameters(crit_params)
+        write_critical_parameters(critParams)
         self.changedStatus.emit(False)
 
     @staticmethod
-    def to_numeric(s: str):
+    def _toNumeric(s: str) -> int or float:
         try:
             num = int(s)
         except ValueError:
