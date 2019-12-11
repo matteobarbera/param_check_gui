@@ -11,7 +11,6 @@ from full_param_list_html_parser import load_param_df
 from load_critical_parameters import read_critical_parameters, write_critical_parameters
 
 
-# TODO Add shortcuts and tooltips
 class App(QDialog):
 
     def __init__(self):
@@ -52,8 +51,10 @@ class App(QDialog):
                                 "parameter is not exactly that value. Any range requirement imposed will thus be "
                                 "ignored.</p>"
                                 
-                                "<p>If one of the range entries is left blank it will default to the parameter's "
-                                "minimum or maximum value.</p>"
+                                "<p>If one of the range entries is left blank the limit will remain unbounded. "
+                                "The application will warn you if the value being specified is outside the min/max "
+                                "value of the parameter, or if the lower limit is larger than the upper limit "
+                                "and vice versa.</p>"
                                 "</span>")
         explanationText.setWordWrap(True)
 
@@ -109,10 +110,11 @@ class App(QDialog):
         self.okBtn.setEnabled(False)
 
         closeBtn = QPushButton("Close")
-        closeBtn.clicked.connect(self.confirmClose)
         closeBtn.setShortcut("Ctrl+Q")
+        closeBtn.clicked.connect(self.confirmClose)
 
         self.applyBtn = QPushButton("Apply")
+        self.applyBtn.setShortcut("Ctrl+S")
         self.applyBtn.clicked.connect(self.addEntryWidget.exportParameters)
         self.applyBtn.setEnabled(False)
 
@@ -168,22 +170,22 @@ class App(QDialog):
 
 class MyQLineEdit(QLineEdit):
 
-    validator_default_min = -1e9
-    validator_default_max = 1e9
-    validator_default_prec = 6
+    validatorDefaultMin = -1e9
+    validatorDefaultMax = 1e9
+    validatorDefaultPrec = 6
 
     def __init__(self):
         super(MyQLineEdit, self).__init__()
         self.defaultStyleSheet = self.styleSheet()
         self.isInputValid = True
 
-    def setIntValidator(self, min_value=validator_default_min, max_value=validator_default_max):
-        validator = QIntValidator(min_value, max_value, self)
+    def setIntValidator(self, minValue=validatorDefaultMin, maxValue=validatorDefaultMax):
+        validator = QIntValidator(minValue, maxValue, self)
         self.setValidator(validator)
 
     def setDoubleValidator(
-            self, min_value=validator_default_min, max_value=validator_default_max, precision=validator_default_prec):
-        validator = QDoubleValidator(min_value, max_value, precision, self)
+            self, minValue=validatorDefaultMin, maxValue=validatorDefaultMax, precision=validatorDefaultPrec):
+        validator = QDoubleValidator(minValue, maxValue, precision, self)
         self.setValidator(validator)
 
     def inputIsValid(self):
@@ -195,7 +197,6 @@ class MyQLineEdit(QLineEdit):
         self.setStyleSheet("QLineEdit { background-color : Salmon; }")
 
 
-# TODO Improve minimum widget height/width
 class ParamWidget(QWidget):
 
     _paramList = load_param_df()
@@ -222,7 +223,7 @@ class ParamWidget(QWidget):
         self.reqValLineEdit = MyQLineEdit()
         self.reqValLineEdit.setMinimumHeight(25)
         self.reqValLineEdit.setMinimumWidth(110)
-        self.reqValLineEdit.setDoubleValidator(MyQLineEdit.validator_default_min, MyQLineEdit.validator_default_max)
+        self.reqValLineEdit.setDoubleValidator(MyQLineEdit.validatorDefaultMin, MyQLineEdit.validatorDefaultMax)
         self.reqValLineEdit.clear()
         self.reqValLineEdit.setReadOnly(True)
         self.reqValLineEdit.textChanged.connect(self.disableRangeBoxes)
@@ -311,6 +312,7 @@ class ParamWidget(QWidget):
         # ------------------ tableLayout --------------------
         self.paramTable = QTableWidget(0, 4)
         self.paramTable.setHorizontalHeaderLabels(["Parameter Name", "Required", "Minimum", "Maximum"])
+        self.paramTable.sortByColumn(0, Qt.AscendingOrder)
         self.paramTable.setSortingEnabled(True)
         self.paramTable.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.paramTable.setShowGrid(False)
@@ -326,12 +328,14 @@ class ParamWidget(QWidget):
 
         self.removeEntryBtn = QPushButton()
         self.removeEntryBtn.setIcon(QIcon("minus_icon.png"))
+        self.removeEntryBtn.setToolTip("Remove entry")
         self.removeEntryBtn.setFlat(True)
         self.removeEntryBtn.setMaximumSize(20, 20)
         self.removeEntryBtn.clicked.connect(self.removeEntry)
 
         self.editEntryBtn = QPushButton()
         self.editEntryBtn.setIcon(QIcon("edit_icon.png"))
+        self.editEntryBtn.setToolTip("Edit entry")
         self.editEntryBtn.setFlat(True)
         self.editEntryBtn.setMaximumSize(20, 20)
         self.editEntryBtn.setEnabled(False)
@@ -352,17 +356,17 @@ class ParamWidget(QWidget):
         tableLayout.addWidget(self.paramTable)
         tableLayout.addWidget(btnFrame)
 
-        # ---------------- clearEntryBtn --------------------
-        clearEntryBtn = QPushButton("Clear All")
-        clearEntryBtn.setIcon(QIcon("minus_icon.png"))
-        clearEntryBtn.clicked.connect(self.removeAllEntries)
+        # ---------------- removeAllBtn ---------------------
+        removeAllBtn = QPushButton("Clear All")
+        removeAllBtn.setIcon(QIcon("minus_icon.png"))
+        removeAllBtn.clicked.connect(self.removeAllEntries)
 
         # ===================================================
         layout = QVBoxLayout()
         layout.addLayout(paramInputLayout)
         layout.addWidget(self.descriptionBox)
         layout.addLayout(tableLayout)
-        layout.addWidget(clearEntryBtn)
+        layout.addWidget(removeAllBtn)
         self.setLayout(layout)
 
     def addEntry(self):
@@ -447,9 +451,9 @@ class ParamWidget(QWidget):
 
     @staticmethod
     def setSpinboxDetails(lineEdit_: MyQLineEdit, parameterName: str, labelArgument: str):
-        min_value = MyQLineEdit.validator_default_min
-        max_value = MyQLineEdit.validator_default_max
-        precision = MyQLineEdit.validator_default_prec
+        min_value = MyQLineEdit.validatorDefaultMin
+        max_value = MyQLineEdit.validatorDefaultMax
+        precision = MyQLineEdit.validatorDefaultPrec
         if not isnan(ParamWidget._paramList.loc[parameterName, "Min"]):
             min_value = ParamWidget._paramList.loc[parameterName, "Min"]
         if not isnan(ParamWidget._paramList.loc[parameterName, "Max"]):
@@ -525,8 +529,8 @@ class ParamWidget(QWidget):
             self.rangeHighLineEdit.setDisabled(False)
 
     def checkValid(self):
-        minVal = MyQLineEdit.validator_default_min
-        maxVal = MyQLineEdit.validator_default_max
+        minVal = MyQLineEdit.validatorDefaultMin
+        maxVal = MyQLineEdit.validatorDefaultMax
         if self.paramLineEdit.text() in ParamWidget._paramList["Name"]:
             parameterName = self.paramLineEdit.text()
             if not isnan(ParamWidget._paramList.loc[parameterName, "Min"]):

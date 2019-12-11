@@ -1,19 +1,20 @@
 import os
 import pickle
+from typing import Iterator
 
 import pandas as pd
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, element
 from numpy import nan
 
 
-def parse_url(url):
+def parse_url(url: str) -> Iterator[pd.DataFrame]:
     response = requests.get(url)
     soup = BeautifulSoup(response.text, 'lxml')
     return (parse_html_table(table) for table in soup.find_all('table'))
 
 
-def parse_html_table(table):
+def parse_html_table(table: element.Tag) -> pd.DataFrame:
     n_columns = 0
     n_rows = 0
     column_names = []
@@ -106,12 +107,12 @@ def extract_param_data():
     save_to_pickle(param_data_df)
 
 
-def save_to_pickle(data):
+def save_to_pickle(data: pd.DataFrame):
     with open(pickle_file_name, 'wb') as f:
         pickle.dump(data, f)
 
 
-def load_param_df():
+def load_param_df() -> pd.DataFrame:
     pickle_f_exists = os.path.isfile(".//" + pickle_file_name)
     if not pickle_f_exists:
         extract_param_data()
