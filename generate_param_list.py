@@ -1,9 +1,9 @@
 import sys
 
-from PySide2.QtCore import QStringListModel
-from PySide2.QtGui import QIcon, Qt, QFont, QIntValidator, QDoubleValidator
+from PySide2.QtCore import QStringListModel, Signal, Slot
+from PySide2.QtGui import QIcon, Qt, QFont, QIntValidator, QDoubleValidator, QPixmap
 from PySide2.QtWidgets import (QDialog, QApplication, QWidget, QVBoxLayout, QPushButton, QMessageBox, QFrame, QLabel,
-                               QTextBrowser, QHBoxLayout, QLineEdit, QCompleter, QTableWidget,
+                               QTextBrowser, QHBoxLayout, QLineEdit, QCompleter, QTableWidget, QSizePolicy,
                                QHeaderView, QTableWidgetItem, QAbstractItemView)
 from numpy import isnan
 
@@ -11,6 +11,7 @@ from full_param_list_html_parser import load_param_df
 from load_critical_parameters import read_critical_parameters, write_critical_parameters
 
 
+# TODO Add shortcuts and tooltips
 class App(QDialog):
 
     def __init__(self):
@@ -24,11 +25,15 @@ class App(QDialog):
         self.setWindowTitle(self.title)
         self.setGeometry(self.left, self.top, self.width, self.height)
 
+        self.hasChanged = False
+
         self.mainLayout = QVBoxLayout()
 
         self.create_top_layout()
         self.create_centre_layout()
         self.create_bottom_layout()
+
+        self.addEntryWidget.changedStatus.connect(self.changes_made)
 
         self.setLayout(self.mainLayout)
         self.show()
@@ -77,33 +82,88 @@ class App(QDialog):
         self.mainLayout.addLayout(centreLayout)
 
     def create_bottom_layout(self):
-        okBtn = QPushButton("Ok")
+        changesMadeImage = QPixmap("check_icon.png")
+
+        self.changesMadeIcon = QLabel()
+        self.changesMadeIcon.setPixmap(changesMadeImage.scaled(16, 16, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        self.changesMadeIcon.setMaximumHeight(25)
+
+        self.changesMadeLabel = QLabel("No unsaved changes")
+        self.changesMadeLabel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+
+        changesMadeLayout = QHBoxLayout()
+        changesMadeLayout.addStretch(1)
+        changesMadeLayout.addWidget(self.changesMadeIcon)
+        changesMadeLayout.addWidget(self.changesMadeLabel)
+        changesMadeLayout.addStretch(1)
+        changesMadeLayout.setContentsMargins(0, 3, 0, 3)
+
+        self.changesMadeFrame = QFrame()
+        self.changesMadeFrame.setFrameStyle(QFrame.StyledPanel | QFrame.Plain)
+        self.changesMadeFrame.setStyleSheet("QFrame { background-color: Palegreen; }")
+        self.changesMadeFrame.setMinimumWidth(250)
+        self.changesMadeFrame.setLayout(changesMadeLayout)
+
+        self.okBtn = QPushButton("Ok")
+        self.okBtn.clicked.connect(self.save_and_close)
+        self.okBtn.setEnabled(False)
 
         closeBtn = QPushButton("Close")
         closeBtn.clicked.connect(self.confirm_close)
         closeBtn.setShortcut("Ctrl+Q")
 
-        applyBtn = QPushButton("Apply")
-        applyBtn.clicked.connect(self.addEntryWidget.export_parameters)
+        self.applyBtn = QPushButton("Apply")
+        self.applyBtn.clicked.connect(self.addEntryWidget.export_parameters)
+        self.applyBtn.setEnabled(False)
 
-        bottomLayout = QHBoxLayout()
-        bottomLayout.addStretch(1)
-        bottomLayout.addWidget(okBtn)
-        bottomLayout.addWidget(closeBtn)
-        bottomLayout.addWidget(applyBtn)
+        bottomBtnLayout = QHBoxLayout()
+        bottomBtnLayout.addStretch(1)
+        bottomBtnLayout.addWidget(self.changesMadeFrame)
+        bottomBtnLayout.addWidget(self.okBtn)
+        bottomBtnLayout.addWidget(closeBtn)
+        bottomBtnLayout.addWidget(self.applyBtn)
 
-        self.mainLayout.addLayout(bottomLayout)
+        mainBottomLayout = QVBoxLayout()
+        mainBottomLayout.addLayout(bottomBtnLayout)
+
+        self.mainLayout.addLayout(mainBottomLayout)
 
     def confirm_close(self):
-        # TODO CHANGE THIS
+        if self.hasChanged:
+            choice = QMessageBox.question(self, "Close Window", "Close application?\nThere are unsaved changes",
+                                          QMessageBox.Yes, QMessageBox.No)
+            if choice == QMessageBox.Yes:
+                sys.exit()
+            else:
+                pass
+        else:
+            sys.exit()
+
+    def save_and_close(self):
+        self.addEntryWidget.export_parameters()
         sys.exit()
 
-        choice = QMessageBox.question(self, "Close Window", "Close?",
-                                      QMessageBox.Yes, QMessageBox.No)
-        if choice == QMessageBox.Yes:
-            sys.exit()
+    @Slot(bool)
+    def changes_made(self, changesMade):
+        icon_size = 16
+        if changesMade:
+            self.hasChanged = True
+            self.okBtn.setEnabled(True)
+            self.applyBtn.setEnabled(True)
+            icon = QPixmap("cross_icon.png")
+            self.changesMadeIcon.setPixmap(
+                icon.scaled(icon_size, icon_size, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            self.changesMadeLabel.setText("Unsaved changes")
+            self.changesMadeFrame.setStyleSheet("QFrame { background-color: Salmon; }")
         else:
-            pass
+            self.hasChanged = False
+            self.okBtn.setEnabled(False)
+            self.applyBtn.setEnabled(False)
+            icon = QPixmap("check_icon.png")
+            self.changesMadeIcon.setPixmap(
+                icon.scaled(icon_size, icon_size, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            self.changesMadeLabel.setText("No unsaved changes")
+            self.changesMadeFrame.setStyleSheet("QFrame { background-color: Palegreen; }")
 
 
 class MyQLineEdit(QLineEdit):
@@ -126,6 +186,7 @@ class MyQLineEdit(QLineEdit):
 class ParamWidget(QWidget):
 
     _paramList = load_param_df()
+    changedStatus = Signal(bool)
 
     def __init__(self):
         super(ParamWidget, self).__init__()
@@ -322,6 +383,7 @@ class ParamWidget(QWidget):
                 self.paramTableView.setItem(0, 3, QTableWidgetItem(self.rangeHighLineEdit.text()))
             self.paramTableView.setSortingEnabled(True)
             self.paramLineEdit.clear()
+        self.changedStatus.emit(True)
 
     def edit_entry(self):
         row_index = self.paramTableView.currentRow()
@@ -332,6 +394,7 @@ class ParamWidget(QWidget):
         indices = sorted([index.row() for index in selection], reverse=True)
         for index in indices:
             self.paramTableView.removeRow(index)
+        self.changedStatus.emit(True)
 
     def remove_all_entries(self):
         choice = QMessageBox.question(self, "Confirm Clear All", "\nClear all entries?",
@@ -476,6 +539,7 @@ class ParamWidget(QWidget):
             crit_params[self.paramTableView.item(i, 0).text()] = values
 
         write_critical_parameters(crit_params)
+        self.changedStatus.emit(False)
 
     @staticmethod
     def to_numeric(s: str):
