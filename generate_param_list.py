@@ -144,9 +144,9 @@ class App(QDialog):
         sys.exit()
 
     @Slot(bool)
-    def changes_made(self, changesMade):
+    def changes_made(self, changes_made):
         icon_size = 16
-        if changesMade:
+        if changes_made:
             self.hasChanged = True
             self.okBtn.setEnabled(True)
             self.applyBtn.setEnabled(True)
@@ -168,16 +168,31 @@ class App(QDialog):
 
 class MyQLineEdit(QLineEdit):
 
+    validator_default_min = -1e9
+    validator_default_max = 1e9
+    validator_default_prec = 6
+
     def __init__(self):
         super(MyQLineEdit, self).__init__()
+        self.defaultStyleSheet = self.styleSheet()
+        self.isInputValid = True
 
-    def set_int_validator(self, min_value=-1e9, max_value=1e9):
+    def set_int_validator(self, min_value=validator_default_min, max_value=validator_default_max):
         validator = QIntValidator(min_value, max_value, self)
         self.setValidator(validator)
 
-    def set_double_validator(self, min_value=-1e9, max_value=1e9, precision=6):
+    def set_double_validator(
+            self, min_value=validator_default_min, max_value=validator_default_max, precision=validator_default_prec):
         validator = QDoubleValidator(min_value, max_value, precision, self)
         self.setValidator(validator)
+
+    def input_is_valid(self):
+        self.isInputValid = True
+        self.setStyleSheet(self.defaultStyleSheet)
+
+    def input_is_invalid(self):
+        self.isInputValid = False
+        self.setStyleSheet("QLineEdit { background-color : Salmon; }")
 
 
 # TODO Improve code layout
@@ -209,22 +224,25 @@ class ParamWidget(QWidget):
         self.reqValLineEdit = MyQLineEdit()
         self.reqValLineEdit.setMinimumHeight(25)
         self.reqValLineEdit.setMinimumWidth(110)
-        self.reqValLineEdit.set_double_validator(min_value=-1e9, max_value=1e9)
+        self.reqValLineEdit.set_double_validator(MyQLineEdit.validator_default_min, MyQLineEdit.validator_default_max)
         self.reqValLineEdit.clear()
         self.reqValLineEdit.setReadOnly(True)
         self.reqValLineEdit.textChanged.connect(self.disable_range_boxes)
+        self.reqValLineEdit.textChanged.connect(self.check_valid)
 
         self.rangeLowLineEdit = MyQLineEdit()
         self.rangeLowLineEdit.setMinimumHeight(25)
         self.rangeLowLineEdit.setMinimumWidth(100)
         self.rangeLowLineEdit.clear()
         self.rangeLowLineEdit.setReadOnly(True)
+        self.rangeLowLineEdit.textChanged.connect(self.check_valid)
 
         self.rangeHighLineEdit = MyQLineEdit()
         self.rangeHighLineEdit.setMinimumHeight(25)
         self.rangeHighLineEdit.setMinimumWidth(100)
         self.rangeHighLineEdit.clear()
         self.rangeHighLineEdit.setReadOnly(True)
+        self.rangeHighLineEdit.textChanged.connect(self.check_valid)
 
         # ---------------- headerLayout ---------------------
         myFont = QFont()
@@ -361,6 +379,14 @@ class ParamWidget(QWidget):
                 self.add_row()
 
     def add_row(self):
+        if not (self.reqValLineEdit.isInputValid and self.rangeLowLineEdit.isInputValid and
+                self.rangeHighLineEdit.isInputValid):
+            choice = QMessageBox.question(self, "Warning",
+                                          "One of the specified values is outside the expected valid ranges."
+                                          "\nAre you sure you want to add this parameter to the table?",
+                                          QMessageBox.Yes, QMessageBox.No)
+            if choice == QMessageBox.No:
+                return
         for i in range(self.paramTableView.rowCount()):
             if self.paramLineEdit.text() == self.paramTableView.item(i, 0).text():
                 choice = QMessageBox.question(self, "Warning",
@@ -372,8 +398,8 @@ class ParamWidget(QWidget):
                     break
                 else:
                     return
-        # TODO Add logic to prevent wrong values being filled (outside of range, lower greater than upper, etc.)
-        if len((self.reqValLineEdit.text() + self.rangeLowLineEdit.text() + self.rangeHighLineEdit.text()).strip()) != 0:
+        if len((self.reqValLineEdit.text().strip(" -") + self.rangeLowLineEdit.text().strip(" -") +
+                self.rangeHighLineEdit.text()).strip(" -")) != 0:
             self.paramTableView.setSortingEnabled(False)
             self.paramTableView.insertRow(0)
             self.paramTableView.setItem(0, 0, QTableWidgetItem(self.paramLineEdit.text()))
@@ -415,9 +441,9 @@ class ParamWidget(QWidget):
 
     @staticmethod
     def set_spinbox_details(spinbox: MyQLineEdit, parameter_name: str, label_argument: str):
-        min_value = -1e9
-        max_value = 1e9
-        precision = 6
+        min_value = MyQLineEdit.validator_default_min
+        max_value = MyQLineEdit.validator_default_max
+        precision = MyQLineEdit.validator_default_prec
         if not isnan(ParamWidget._paramList.loc[parameter_name, "Min"]):
             min_value = ParamWidget._paramList.loc[parameter_name, "Min"]
         if not isnan(ParamWidget._paramList.loc[parameter_name, "Max"]):
@@ -491,6 +517,41 @@ class ParamWidget(QWidget):
         else:
             self.rangeLowLineEdit.setDisabled(False)
             self.rangeHighLineEdit.setDisabled(False)
+
+    def check_valid(self):
+        min_val = MyQLineEdit.validator_default_min
+        max_val = MyQLineEdit.validator_default_max
+        if self.paramLineEdit.text() in ParamWidget._paramList["Name"]:
+            parameterName = self.paramLineEdit.text()
+            if not isnan(ParamWidget._paramList.loc[parameterName, "Min"]):
+                min_val = ParamWidget._paramList.loc[parameterName, "Min"]
+            if not isnan(ParamWidget._paramList.loc[parameterName, "Max"]):
+                max_val = ParamWidget._paramList.loc[parameterName, "Max"]
+
+        if len(self.reqValLineEdit.text().strip("- ")) != 0:
+            reqVal = self.to_numeric(self.reqValLineEdit.text())
+            if reqVal < min_val or reqVal > max_val:
+                self.reqValLineEdit.input_is_invalid()
+            else:
+                self.reqValLineEdit.input_is_valid()
+        else:
+            self.reqValLineEdit.input_is_valid()
+
+        lowVal = min_val
+        uppVal = max_val
+        if len(self.rangeLowLineEdit.text().strip(" -")) != 0:
+            lowVal = self.to_numeric(self.rangeLowLineEdit.text())
+        if len(self.rangeHighLineEdit.text().strip(" -")) != 0:
+            uppVal = self.to_numeric(self.rangeHighLineEdit.text())
+
+        if lowVal < min_val or lowVal > max_val or lowVal > uppVal:
+            self.rangeLowLineEdit.input_is_invalid()
+        else:
+            self.rangeLowLineEdit.input_is_valid()
+        if uppVal < min_val or uppVal > max_val or uppVal < lowVal:
+            self.rangeHighLineEdit.input_is_invalid()
+        else:
+            self.rangeHighLineEdit.input_is_valid()
 
     def select_row(self):
         selection = self.paramTableView.selectionModel().selectedRows()
